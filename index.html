@@ -149,7 +149,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
   <img src="icon-192.png" alt="">
   <h1>Cal Pro Tracker</h1>
   <p class="note">Sign in to keep your log in sync.</p>
-  <button class="actions primary" id="gBtn" style="height:48px;border-radius:12px;font-weight:600">Sign in with Google</button>
+  <button class="primary" id="gBtn" style="height:48px;border-radius:12px;font-weight:600;width:100%">Sign in with Google</button>
   <details>
     <summary class="small" style="cursor:pointer">Use email and password instead</summary>
     <form id="emailForm" style="margin-top:10px">
@@ -238,12 +238,14 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script>
-/* ===== PASTE YOUR FIREBASE WEB CONFIG HERE (Firebase console > Project settings > Your apps) ===== */
+/* ===== Firebase config: rwapps1-hub project (same as your other tools) ===== */
 const FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  appId: "PASTE_APP_ID"
+  apiKey: "AIzaSyAYf97LVA839hP-jUpbwQJ7JgftMvdwKLQ",
+  authDomain: "rwapps1-hub.firebaseapp.com",
+  projectId: "rwapps1-hub",
+  storageBucket: "rwapps1-hub.firebasestorage.app",
+  messagingSenderId: "605178772138",
+  appId: "1:605178772138:web:0508b89695ce7588936ed3"
 };
 /* ================================================================================================ */
 
