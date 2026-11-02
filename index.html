@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Cal Pro Tracker</title>
+<meta name="theme-color" content="#173404">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#f2f3ef;--surface:#ffffff;--surface-2:#f6f7f3;--ink:#171a18;--muted:#5d655f;--line:#dcdfd8;
+  --kcal:#c4740c;--kcal-soft:#fbecd3;--pro:#16766a;--pro-soft:#d5ede7;--over:#b8322a;--over-soft:#f8dcd9;
+  --btn:#173404;--on-btn:#ffffff;--scrim:rgba(10,12,11,.45);
+  --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
+  --body:"Figtree","Segoe UI",Roboto,system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0f130f;--surface:#181d18;--surface-2:#141914;--ink:#ecefea;--muted:#9ba49d;--line:#2b322c;
+  --kcal:#f0a63a;--kcal-soft:#3a2a12;--pro:#4cc4ab;--pro-soft:#13332c;--over:#ff7c6e;--over-soft:#3d1c19;
+  --btn:#cfe8b8;--on-btn:#10200a;--scrim:rgba(0,0,0,.6);color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(150px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+[hidden]{display:none!important}
+button,label.btnlike{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--pro);outline-offset:2px}
+input{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;height:44px;padding:0 12px;width:100%;min-width:0}
+input::placeholder{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.top h1{font-family:var(--display);font-weight:700;font-size:24px;margin:0;letter-spacing:-.01em}
+.top p{margin:0;color:var(--muted);font-size:13px}
+.iconbtn{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;border:1px solid var(--line);background:var(--surface);flex:none}
+.iconbtn svg{width:22px;height:22px}
+.summary{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:16px;display:grid;gap:16px}
+.meter-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.meter-label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.big{font-family:var(--display);font-weight:700;font-size:34px;line-height:1;letter-spacing:-.02em}
+.of{color:var(--muted);font-size:14px;margin-left:4px}
+.status{font-size:13px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.track{height:12px;border-radius:6px;background:var(--surface-2);border:1px solid var(--line);overflow:hidden;margin-top:8px}
+.fill{height:100%;border-radius:6px;transition:width .4s ease}
+section h2{font-family:var(--display);font-weight:500;font-size:18px;margin:0 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+section h2 small{font-family:var(--body);font-size:13px;color:var(--muted);font-weight:400}
+.list{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.row{display:flex;width:100%;text-align:left;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);min-height:56px}
+.row:last-child{border-bottom:0}
+.row:active{background:var(--surface-2)}
+.row .nm{font-weight:500;min-width:0;overflow-wrap:anywhere}
+.row .meta{font-size:12px;color:var(--muted)}
+.row .vals{text-align:right;flex:none;font-size:14px}
+.row .vals b{font-weight:600;color:var(--kcal)}
+.row .vals span{display:block;color:var(--pro);font-weight:600}
+.empty{padding:18px 14px;color:var(--muted);font-size:14px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-size:14px;min-height:40px;white-space:nowrap}
+.chip em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}
+.week{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
+.avg{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-bottom:10px}
+.avg b{font-family:var(--display);font-size:20px;font-weight:700}
+.bars{position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;height:130px;align-items:end}
+.bars .tline{position:absolute;left:0;right:0;border-top:1.5px dashed var(--muted);opacity:.6;pointer-events:none}
+.bar{display:flex;flex-direction:column;justify-content:flex-end;height:100%;border-radius:8px;padding:0}
+.bar i{display:block;border-radius:7px 7px 3px 3px;background:var(--kcal);min-height:3px}
+.bar.over i{background:var(--over)}
+.bar.today i{background:repeating-linear-gradient(45deg,var(--kcal),var(--kcal) 5px,var(--kcal-soft) 5px,var(--kcal-soft) 9px)}
+.bar.sel{outline:2px solid var(--ink);outline-offset:2px}
+.blabels{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:6px;text-align:center;font-size:12px}
+.blabels div{color:var(--muted)}
+.blabels .p{font-weight:600}
+.blabels .p.hit{color:var(--pro)}
+.daydetail{margin-top:12px}
+.daydetail h3{font-size:14px;font-weight:600;margin:0 0 6px}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.banner{background:var(--kcal-soft);border-radius:12px;padding:10px 12px;font-size:14px}
+.banner button{text-decoration:underline;font-weight:600}
+/* sign in */
+.signin{max-width:420px;margin:12vh auto 0;display:grid;gap:14px;text-align:center}
+.signin img{width:84px;height:84px;margin:0 auto;border-radius:20px}
+.signin h1{font-family:var(--display);margin:0;font-size:28px}
+.signin form{display:grid;gap:10px;text-align:left}
+/* add bar */
+.addbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.addbar .in{max-width:560px;margin:0 auto;display:grid;gap:8px}
+.r1{display:flex;gap:8px}
+.r2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px}
+.addbtn{background:var(--btn);color:var(--on-btn);border-radius:10px;padding:0 20px;height:44px;font-weight:600}
+.err{color:var(--over);font-size:13px}
+/* sheet */
+#scrim{position:fixed;inset:0;background:var(--scrim);z-index:30}
+#sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--surface);border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;
+  padding:8px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));animation:up .22s ease}
+@keyframes up{from{transform:translateY(30px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){#sheet{animation:none}.fill{transition:none}}
+.sb{max-width:560px;margin:0 auto;display:grid;gap:14px}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:4px auto 6px}
+.sh{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.sh h3{font-family:var(--display);font-weight:700;font-size:20px;margin:0;overflow-wrap:anywhere}
+.x{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;flex:none}
+.x svg{width:20px;height:20px}
+.kicker{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.note{font-size:14px;color:var(--muted)}
+.conf{font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;margin-left:6px;text-transform:none;letter-spacing:0}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.opt{border:1px solid var(--line);border-radius:12px;padding:10px;min-height:52px;text-align:left;background:var(--surface-2)}
+.opt small{display:block;color:var(--muted);font-size:12px}
+.opt.on{border:2px solid var(--ink);padding:9px;background:var(--surface)}
+.fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
+label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.actions{display:flex;gap:8px}
+.actions>*{flex:1;height:48px;border-radius:12px;font-weight:600;display:grid;place-items:center}
+.primary{background:var(--btn);color:var(--on-btn)}
+.secondary{border:1px solid var(--line);background:var(--surface)}
+.danger{border:1px solid var(--over);color:var(--over)}
+.danger.armed{background:var(--over);color:var(--surface)}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;min-height:40px}
+.check input{width:22px;height:22px}
+.items{font-size:13px;color:var(--muted);display:grid;gap:2px}
+.spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--kcal);animation:sp .9s linear infinite;margin:10px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.prow{display:flex;align-items:center;border-bottom:1px solid var(--line)}
+.prow:last-child{border-bottom:0}
+.prow .row{border:0;flex:1}
+.bigopt{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;padding:14px;min-height:60px;font-weight:600;cursor:pointer;background:var(--surface-2)}
+.bigopt svg{width:24px;height:24px;flex:none}
+/* scanner */
+.scanbox{position:relative;background:#111;border-radius:14px;overflow:hidden;aspect-ratio:3/4;max-height:60vh;width:100%}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanbox .frame{position:absolute;left:12%;right:12%;top:36%;height:28%;border:2px solid #f1efe8;border-radius:12px}
+.scanbox .frame::after{content:"";position:absolute;left:8px;right:8px;top:50%;border-top:2px solid #EF9F27}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);
+  border-radius:12px;padding:10px 14px;font-size:14px;display:flex;gap:14px;align-items:center;max-width:calc(100% - 32px)}
+#toast button{color:var(--bg);font-weight:700;text-decoration:underline;min-height:32px}
+.small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div id="signin" class="signin" hidden>
+  <img src="icon-192.png" alt="">
+  <h1>Cal Pro Tracker</h1>
+  <p class="note">Sign in to keep your log in sync.</p>
+  <button class="actions primary" id="gBtn" style="height:48px;border-radius:12px;font-weight:600">Sign in with Google</button>
+  <details>
+    <summary class="small" style="cursor:pointer">Use email and password instead</summary>
+    <form id="emailForm" style="margin-top:10px">
+      <input id="em" type="email" autocomplete="email" placeholder="you@example.com">
+      <input id="pw" type="password" autocomplete="current-password" placeholder="Password">
+      <button class="secondary" style="height:46px;border-radius:12px;font-weight:600">Sign in</button>
+    </form>
+  </details>
+  <div class="err" id="signErr" hidden></div>
+</div>
+
+<main id="app" hidden>
+  <header class="top">
+    <div><h1 id="dayTitle">Today</h1><p>Day runs 1am to 1am</p></div>
+    <button class="iconbtn" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+
+  <div class="summary">
+    <div>
+      <div class="meter-head"><span class="meter-label">Calories · limit</span><span class="status num" id="kStatus"></span></div>
+      <div><span class="big num" id="kNow">0</span><span class="of num" id="kOf"></span></div>
+      <div class="track"><div class="fill" id="kFill"></div></div>
+    </div>
+    <div>
+      <div class="meter-head"><span class="meter-label">Protein · minimum</span><span class="status num" id="pStatus"></span></div>
+      <div><span class="big num" id="pNow">0</span><span class="of num" id="pOf"></span></div>
+      <div class="track"><div class="fill" id="pFill"></div></div>
+    </div>
+  </div>
+
+  <section id="quickSec" hidden>
+    <h2>Quick add <small>tap to log</small></h2>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <section>
+    <h2>Entries <small id="todayCount"></small></h2>
+    <div class="list" id="todayList"><div class="empty">Loading your log…</div></div>
+  </section>
+
+  <section>
+    <h2>Last 7 days</h2>
+    <div class="week">
+      <div class="avg" id="avg"></div>
+      <div class="bars" id="bars"></div>
+      <div class="blabels" id="blabels"></div>
+      <div class="hint">Bars show calories against your limit. Numbers underneath are protein (g). Tap a day to see it.</div>
+      <div class="daydetail" id="dayDetail" hidden></div>
+    </div>
+  </section>
+</main>
+
+<div class="addbar" id="addbar" hidden>
+  <div class="in">
+    <div class="r1">
+      <input id="desc" placeholder="Tesco chicken wrap" autocomplete="off" enterkeyhint="done">
+      <button class="iconbtn" id="scanBtn" aria-label="Scan a barcode">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>
+      </button>
+      <button class="iconbtn" id="photoBtn" aria-label="Photo of food or label">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      </button>
+      <button class="iconbtn" id="presetBtn" aria-label="Presets">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M7 4h10v16l-5-4-5 4z"/></svg>
+      </button>
+    </div>
+    <div class="r2">
+      <input id="kIn" inputmode="numeric" placeholder="kcal" aria-label="Calories" autocomplete="off">
+      <input id="pIn" inputmode="decimal" placeholder="protein g" aria-label="Protein grams" autocomplete="off">
+      <button class="addbtn" id="addBtn">Add</button>
+    </div>
+    <div class="err" id="addErr" hidden></div>
+  </div>
+</div>
+
+<input type="file" id="camFile" accept="image/*" capture="environment" hidden>
+<input type="file" id="galFile" accept="image/*" hidden>
+<div id="scrim" hidden></div>
+<section id="sheet" hidden role="dialog" aria-modal="true"><div class="grab"></div><div class="sb" id="sheetBody"></div></section>
+<div id="toast" hidden></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+/* ===== PASTE YOUR FIREBASE WEB CONFIG HERE (Firebase console > Project settings > Your apps) ===== */
+const FIREBASE_CONFIG = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "PASTE_PROJECT.firebaseapp.com",
+  projectId: "PASTE_PROJECT_ID",
+  appId: "PASTE_APP_ID"
+};
+/* ================================================================================================ */
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Math.round(n||0).toLocaleString('en-GB');
+const fmtP=n=>{const r=Math.round((n||0)*10)/10;return Number.isInteger(r)?String(r):r.toFixed(1)};
+const num=v=>{v=String(v??'').trim().replace(',','.');if(v==='')return null;const n=Number(v);return isFinite(n)&&n>=0?n:null};
+const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
+const lsSet=(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}};
+const X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+function dayKey(ts){const d=new Date(ts-3600000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function keyDate(k){const[y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d,12)}
+function addDays(k,n){const d=keyDate(k);d.setDate(d.getDate()+n);return dayKey(d.getTime()+3600000)}
+const dayLabel=(k,o)=>keyDate(k).toLocaleDateString('en-GB',o||{weekday:'short',day:'numeric',month:'short'});
+const timeLabel=ts=>new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+
+const S={base:null,entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
+const SRC={typed:'typed',estimate:'estimated',photo:'photo',barcode:'barcode',search:'food database',preset:'preset',quick:'quick add'};
+
+/* ===== Firebase ===== */
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth=firebase.auth(), db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+auth.onAuthStateChanged(u=>{
+  S.unsub.forEach(f=>f());S.unsub=[];if(S.entUnsub){S.entUnsub();S.entUnsub=null}
+  if(!u){$('#signin').hidden=false;$('#app').hidden=true;$('#addbar').hidden=true;return}
+  $('#signin').hidden=true;$('#app').hidden=false;$('#addbar').hidden=false;
+  S.base=db.collection('calpro').doc(u.uid);
+  S.unsub.push(S.base.onSnapshot(s=>{const d=s.data();if(d&&d.settings&&d.settings.kcal){S.settings={kcal:+d.settings.kcal,protein:+d.settings.protein};render()}},()=>{}));
+  S.unsub.push(S.base.collection('presets').onSnapshot(s=>{S.presets=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{}));
+  subscribe();
+  if(!lsGet('calpro.gemkey'))banner('Add your free Gemini key in Settings to read photos and estimate food. <button id="bKey">Open Settings</button>',()=>$('#bKey').onclick=settingsSheet);
+});
+$('#gBtn').onclick=async()=>{signErr('');const p=new firebase.auth.GoogleAuthProvider();
+  try{await auth.signInWithPopup(p)}catch(e){if(/popup/.test(e.code||''))auth.signInWithRedirect(p);else signErr(authMsg(e))}};
+$('#emailForm').onsubmit=async e=>{e.preventDefault();signErr('');try{await auth.signInWithEmailAndPassword($('#em').value.trim(),$('#pw').value)}catch(err){signErr(authMsg(err))}};
+function authMsg(e){const c=e&&e.code||'';if(/wrong-password|invalid-credential|user-not-found/.test(c))return 'Email or password is wrong.';if(/unauthorized-domain/.test(c))return 'This web address isn’t approved in Firebase. Add it under Authentication > Settings > Authorised domains.';if(/network/.test(c))return 'No connection. Try again when you’re online.';return 'Sign-in failed ('+c+').'}
+function signErr(m){$('#signErr').textContent=m;$('#signErr').hidden=!m}
+
+function subscribe(){
+  if(S.entUnsub)S.entUnsub();
+  S.entUnsub=S.base.collection('entries').where('day','>=',addDays(S.today,-6)).onSnapshot(snap=>{
+    S.ready=true;S.entries=snap.docs.map(d=>({id:d.id,...d.data()}));render()},
+    err=>banner('Your log could not load ('+esc(err.code||'error')+'). Check the Firestore rules.'));
+}
+function addEntry(e,msg){
+  if(!S.base)return;
+  const ts=Date.now(),ref=S.base.collection('entries').doc();
+  const d={day:dayKey(ts),ts,name:(e.name||'Entry').slice(0,80),kcal:Math.round(+e.kcal||0),protein:Math.round((+e.protein||0)*10)/10,src:e.src||'typed'};
+  ref.set(d).catch(()=>toast('Could not save that entry.'));
+  toast(msg||('Added '+d.name),()=>ref.delete());
+}
+function savePreset(p,id){
+  const d={name:(p.name||'Preset').slice(0,60),kcal:Math.round(+p.kcal||0),protein:Math.round((+p.protein||0)*10)/10};
+  const c=S.base.collection('presets');(id?c.doc(id).update(d):c.add({...d,uses:0,lastUsed:0})).catch(()=>toast('Could not save preset.'));
+}
+function usePreset(p){addEntry({name:p.name,kcal:p.kcal,protein:p.protein,src:'preset'});S.base.collection('presets').doc(p.id).update({uses:(p.uses||0)+1,lastUsed:Date.now()}).catch(()=>{})}
+
+/* ===== rendering ===== */
+function totals(day){let k=0,p=0;for(const e of S.entries)if(e.day===day){k+=+e.kcal||0;p+=+e.protein||0}return{k,p}}
+function dayEntries(day){return S.entries.filter(e=>e.day===day).sort((a,b)=>b.ts-a.ts)}
+function rowHTML(e){return `<button class="row" data-id="${esc(e.id)}"><div style="min-width:0"><div class="nm">${esc(e.name)}</div><div class="meta">${timeLabel(e.ts)} · ${SRC[e.src]||esc(e.src)}</div></div><div class="vals num"><b>${fmt(e.kcal)} kcal</b><span>${fmtP(e.protein)} g</span></div></button>`}
+function render(){
+  const t=S.today,st=S.settings,{k,p}=totals(t);
+  $('#dayTitle').textContent=dayLabel(t,{weekday:'long',day:'numeric',month:'short'});
+  $('#kNow').textContent=fmt(k);$('#kOf').textContent='/ '+fmt(st.kcal)+' kcal';
+  $('#pNow').textContent=fmtP(p);$('#pOf').textContent='/ '+fmt(st.protein)+' g';
+  const kr=st.kcal?k/st.kcal:0,kf=$('#kFill'),ks=$('#kStatus');kf.style.width=Math.min(100,kr*100)+'%';
+  if(k>st.kcal){kf.style.background='var(--over)';ks.textContent=fmt(k-st.kcal)+' over';ks.style.cssText='background:var(--over-soft);color:var(--over)'}
+  else{kf.style.background=kr>=.9?'var(--over)':'var(--kcal)';ks.textContent=fmt(st.kcal-k)+' left';ks.style.cssText='background:var(--kcal-soft);color:var(--kcal)'}
+  const pr=st.protein?p/st.protein:0,pf=$('#pFill'),ps=$('#pStatus');pf.style.width=Math.min(100,pr*100)+'%';pf.style.background='var(--pro)';
+  if(p>=st.protein){ps.textContent='Target hit'+(p>st.protein?' +'+fmtP(p-st.protein)+' g':'');ps.style.cssText='background:var(--pro);color:var(--surface)'}
+  else{ps.textContent=fmtP(st.protein-p)+' g to go';ps.style.cssText='background:var(--pro-soft);color:var(--pro)'}
+  const list=dayEntries(t);
+  $('#todayCount').textContent=list.length?list.length+(list.length===1?' item':' items'):'';
+  $('#todayList').innerHTML=!S.ready?'<div class="empty">Loading your log…</div>':list.length?list.map(rowHTML).join(''):
+    '<div class="empty">Nothing logged yet today. Scan a barcode, snap a photo, type what you had, or pick a preset.</div>';
+  renderChips();renderWeek();
+}
+function renderChips(){
+  const used=[...S.presets].sort((a,b)=>(b.lastUsed||0)-(a.lastUsed||0)||(b.uses||0)-(a.uses||0)).slice(0,5).map(p=>({name:p.name,kcal:p.kcal,protein:p.protein,presetId:p.id}));
+  const names=new Set(used.map(u=>u.name.toLowerCase())),recent=[];
+  for(const e of [...S.entries].sort((a,b)=>b.ts-a.ts)){const n=e.name.toLowerCase();if(!names.has(n)){names.add(n);recent.push({name:e.name,kcal:e.kcal,protein:e.protein})}if(recent.length>=4)break}
+  S.chips=[...used,...recent];$('#quickSec').hidden=!S.chips.length;
+  $('#chips').innerHTML=S.chips.map((c,i)=>`<button class="chip" data-i="${i}">+ ${esc(c.name)}<em class="num">${fmt(c.kcal)}</em></button>`).join('');
+}
+function renderWeek(){
+  const st=S.settings,days=[];for(let i=6;i>=0;i--)days.push(addDays(S.today,-i));
+  const tots=days.map(totals),maxK=Math.max(st.kcal*1.15,...tots.map(t=>t.k),1);
+  const done=tots.slice(0,6).filter(t=>t.k>0||t.p>0);
+  $('#avg').innerHTML=done.length?`<div><b class="num" style="color:var(--kcal)">${fmt(done.reduce((s,t)=>s+t.k,0)/done.length)}</b> kcal avg</div><div><b class="num" style="color:var(--pro)">${fmtP(done.reduce((s,t)=>s+t.p,0)/done.length)}</b> g protein avg</div><div class="small" style="flex-basis:100%">Across ${done.length} logged ${done.length===1?'day':'days'} before today</div>`
+    :'<div class="note">Averages appear once you have a full day logged.</div>';
+  $('#bars').innerHTML=`<div class="tline" style="bottom:${st.kcal/maxK*100}%"></div>`+days.map((d,i)=>{const t=tots[i],c=['bar'];if(t.k>st.kcal)c.push('over');if(d===S.today)c.push('today');if(d===S.sel)c.push('sel');
+    return `<button class="${c.join(' ')}" data-day="${d}" aria-label="${dayLabel(d)}: ${fmt(t.k)} kcal, ${fmtP(t.p)} g protein"><i style="height:${t.k/maxK*100}%"></i></button>`}).join('');
+  $('#blabels').innerHTML=days.map((d,i)=>`<div>${d===S.today?'Today':keyDate(d).toLocaleDateString('en-GB',{weekday:'short'})}<div class="p num ${tots[i].p>=st.protein?'hit':''}">${tots[i].p?Math.round(tots[i].p):'–'}</div></div>`).join('');
+  const dd=$('#dayDetail');
+  if(S.sel){const t=totals(S.sel),l=dayEntries(S.sel);dd.hidden=false;
+    dd.innerHTML=`<h3>${dayLabel(S.sel,{weekday:'long',day:'numeric',month:'short'})} · <span class="num" style="color:var(--kcal)">${fmt(t.k)} kcal</span> · <span class="num" style="color:var(--pro)">${fmtP(t.p)} g</span></h3><div class="list">${l.length?l.map(rowHTML).join(''):'<div class="empty">Nothing logged that day.</div>'}</div>`}
+  else dd.hidden=true;
+}
+
+/* ===== UI helpers ===== */
+let toastT;
+function toast(msg,undo){const t=$('#toast');clearTimeout(toastT);t.innerHTML=`<span>${esc(msg)}</span>`+(undo?'<button id="undo">Undo</button>':'');t.hidden=false;
+  if(undo)$('#undo').onclick=()=>{undo();t.hidden=true};toastT=setTimeout(()=>t.hidden=true,undo?6000:2800)}
+function banner(html,mount){const b=$('#banner');b.innerHTML=html||'';b.hidden=!html;mount&&mount()}
+function addErr(m){$('#addErr').textContent=m||'';$('#addErr').hidden=!m}
+
+/* sheets close on the Android back button via history */
+let sheetOpen=false,onClose=null;
+function openSheet(html,mount,close){
+  if(onClose&&sheetOpen){const f=onClose;onClose=null;f()}
+  $('#sheetBody').innerHTML=html;$('#sheet').hidden=false;$('#scrim').hidden=false;$('#sheet').scrollTop=0;onClose=close||null;
+  if(!sheetOpen){sheetOpen=true;history.pushState({sheet:1},'')}
+  $('#sheetBody').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeSheet());
+  mount&&mount($('#sheetBody'));
+}
+function closeSheet(fromPop){
+  if(!sheetOpen)return;sheetOpen=false;$('#sheet').hidden=true;$('#scrim').hidden=true;
+  if(onClose){const f=onClose;onClose=null;f()}
+  if(!fromPop&&history.state&&history.state.sheet)history.back();
+}
+window.addEventListener('popstate',()=>{if(sheetOpen)closeSheet(true)});
+$('#scrim').onclick=()=>closeSheet();
+const head=(t,k)=>`<div class="sh"><div style="min-width:0">${k?`<div class="kicker">${k}</div>`:''}<h3>${t}</h3></div><button class="x" data-close aria-label="Close">${X}</button></div>`;
+function busy(label,kicker,onCancel){openSheet(`${head(label,kicker)}<div class="spin" role="status" aria-label="Working"></div><div class="actions"><button class="secondary" data-close>Cancel</button></div>`,null,onCancel)}
+
+/* ===== review card ===== */
+const confStyle=c=>c==='high'?'background:var(--pro-soft);color:var(--pro)':c==='low'?'background:var(--over-soft);color:var(--over)':'background:var(--kcal-soft);color:var(--kcal)';
+function review(r){
+  const opts=[],pk=r.pack||{},per=r.per100&&num(r.per100.kcal)!=null?r.per100:null,sv=r.serving;
+  let packK=num(pk.kcal),packP=num(pk.protein);
+  if(packK==null&&per&&num(pk.size)){packK=per.kcal*pk.size/100;packP=(per.protein||0)*pk.size/100}
+  if(r.type==='packaged'){
+    if(packK!=null){opts.push({l:'Whole pack',s:pk.size?fmt(pk.size)+(pk.unit||''):'',k:packK,p:packP||0});opts.push({l:'Half pack',s:pk.size?fmt(pk.size/2)+(pk.unit||''):'',k:packK/2,p:(packP||0)/2})}
+    if(sv&&num(sv.kcal)!=null)opts.push({l:sv.label?String(sv.label).slice(0,24):'1 serving',s:'per serving',k:+sv.kcal,p:+sv.protein||0});
+    if(per)opts.push({l:per.unit==='ml'?'Millilitres':'Grams',s:'enter amount',amt:true,u:per.unit==='ml'?'ml':'g'});
+  }
+  const bk=num(r.kcal)??packK??0,bp=num(r.protein)??packP??0;
+  if(r.type!=='packaged'||!opts.length)[['½',.5],['1',1],['1½',1.5],['2',2]].forEach(([l,m])=>opts.push({l:'× '+l,s:'of estimate',k:bk*m,p:bp*m,m}));
+  let sel=opts.findIndex(o=>o.m===1);if(sel<0)sel=0;
+  const items=(r.items||[]).filter(i=>i&&i.name).slice(0,8);
+  openSheet(`${head(esc(r.name||'Entry'),esc(r.kicker||'')+(r.confidence?`<span class="conf" style="${confStyle(r.confidence)}">${esc(r.confidence)} confidence</span>`:''))}
+    ${r.note?`<div class="note">${esc(r.note)}</div>`:''}
+    ${items.length>1?`<div class="items">${items.map(i=>`<div class="num">${esc(i.name)} · ${fmt(i.kcal)} kcal · ${fmtP(i.protein)} g</div>`).join('')}</div>`:''}
+    ${per&&r.type==='packaged'?`<div class="note num">Per 100${per.unit||'g'}: ${fmt(per.kcal)} kcal · ${fmtP(per.protein)} g protein</div>`:''}
+    <div><div class="kicker" style="margin-bottom:6px">How much did you have?</div><div class="opts">${opts.map((o,i)=>`<button class="opt" data-o="${i}">${esc(o.l)}<small>${esc(o.s||'')}</small></button>`).join('')}</div></div>
+    <label class="f" id="amtWrap" hidden><span id="amtLbl">Amount</span><input id="amt" inputmode="decimal" placeholder="150"></label>
+    <label class="f">Name<input id="rName" value="${esc(r.name||'')}"></label>
+    <div class="fields"><label class="f">Calories (kcal)<input id="rK" inputmode="numeric"></label><label class="f">Protein (g)<input id="rP" inputmode="decimal"></label></div>
+    <label class="check"><input type="checkbox" id="rPreset"> Also save as a preset</label>
+    <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="rAdd">Add to today</button></div>`,
+  b=>{
+    const q=s=>b.querySelector(s);
+    const setVals=(k,p)=>{q('#rK').value=k==null?'':Math.round(k);q('#rP').value=p==null?'':fmtP(p)};
+    const fromAmt=()=>{const a=num(q('#amt').value);if(a!=null&&per)setVals(per.kcal*a/100,(per.protein||0)*a/100)};
+    const pick=i=>{sel=i;b.querySelectorAll('.opt').forEach((x,j)=>x.classList.toggle('on',j===i));const o=opts[i];q('#amtWrap').hidden=!o.amt;
+      if(o.amt){q('#amtLbl').textContent='Amount ('+o.u+')';if(num(q('#amt').value)!=null)fromAmt();else setTimeout(()=>q('#amt').focus(),60)}else setVals(o.k,o.p)};
+    b.querySelectorAll('.opt').forEach(x=>x.onclick=()=>pick(+x.dataset.o));
+    q('#amt').oninput=fromAmt;pick(sel);
+    if(r.fixK!=null)q('#rK').value=Math.round(r.fixK);if(r.fixP!=null)q('#rP').value=fmtP(r.fixP);
+    q('#rAdd').onclick=()=>{
+      const k=num(q('#rK').value),p=num(q('#rP').value),n=q('#rName').value.trim()||r.name||'Entry';
+      if(k==null||p==null){q('#rAdd').textContent='Enter both numbers';setTimeout(()=>q('#rAdd').textContent='Add to today',1800);return}
+      let name=n;const o=opts[sel];
+      if(o&&o.amt){const a=num(q('#amt').value);if(a!=null)name=n+' ('+fmt(a)+o.u+')'}else if(o&&o.l==='Half pack'&&!/half/i.test(n))name='Half '+n;
+      addEntry({name,kcal:k,protein:p,src:r.src});if(q('#rPreset').checked)savePreset({name:n,kcal:k,protein:p});closeSheet();
+    };
+  });
+}
+
+/* ===== Open Food Facts ===== */
+const OFF_FIELDS='code,product_name,product_name_en,brands,quantity,product_quantity,product_quantity_unit,serving_size,nutriments';
+function offToR(p,code){
+  if(!p)return null;const n=p.nutriments||{};
+  let k100=num(n['energy-kcal_100g']);if(k100==null&&num(n['energy_100g'])!=null)k100=n['energy_100g']/4.184;
+  const p100=num(n['proteins_100g']);
+  const unit=(String(p.product_quantity_unit||'').toLowerCase()==='ml'||/\d\s*(ml|cl|l)\b/i.test(p.quantity||''))?'ml':'g';
+  const size=num(p.product_quantity);
+  const per100=k100!=null?{unit,kcal:k100,protein:p100||0}:null;
+  const sk=num(n['energy-kcal_serving']);
+  const serving=sk!=null?{label:p.serving_size||'1 serving',kcal:sk,protein:num(n['proteins_serving'])||0}:null;
+  if(!per100&&!serving)return null;
+  const brand=String(p.brands||'').split(',')[0].trim(),pn=p.product_name_en||p.product_name||'';
+  const name=(pn&&brand&&!pn.toLowerCase().includes(brand.toLowerCase())?brand+' '+pn:pn||brand||('Barcode '+(code||p.code)))+(p.quantity&&!/\d/.test(pn)?' '+p.quantity:'');
+  return{type:'packaged',name:name.slice(0,70),pack:{size,unit,kcal:null,protein:null},per100,serving,confidence:'high',note:'From Open Food Facts'+(per100&&p100==null?' (no protein figure listed)':''),kicker:'Food database',src:'barcode',code:code||p.code};
+}
+async function offBarcode(code,signal){
+  const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`,{signal});
+  if(r.status===404)return null;if(!r.ok)throw new Error('off '+r.status);
+  const j=await r.json();return j.status===1||j.product?offToR(j.product,code):null;
+}
+async function offSearch(text,signal){
+  const u=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20&sort_by=unique_scans_n&tagtype_0=countries&tag_contains_0=contains&tag_0=united-kingdom&fields=${OFF_FIELDS}`;
+  const r=await fetch(u,{signal});if(!r.ok)throw new Error('off '+r.status);
+  const j=await r.json();return(j.products||[]).map(p=>offToR(p,p.code)).filter(Boolean).slice(0,8);
+}
+
+/* ===== Gemini (free key, stored on this device only) ===== */
+const GEM_ERR={nokey:'Add your free Gemini key in Settings to use estimates and photo reading.',429:'You’ve hit Gemini’s free limit for now. Try again later or enter the numbers yourself.',400:'Gemini rejected the request. Check the key and model in Settings.',403:'Gemini refused the key. Check it in Settings.',404:'That Gemini model wasn’t found. Check the model name in Settings.'};
+function parseJSON(t){t=String(t||'').replace(/```(?:json)?/gi,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw{code:'json'};return JSON.parse(t.slice(a,b+1))}
+async function gemini(parts,{search=false,signal}={}){
+  const key=lsGet('calpro.gemkey');if(!key)throw{code:'nokey'};
+  const model=lsGet('calpro.model')||'gemini-flash-latest';
+  const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.2}};
+  if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
+  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
+  if(!res.ok){const j=await res.json().catch(()=>({}));throw{code:res.status,message:j.error&&j.error.message}}
+  const j=await res.json();const text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('');
+  return parseJSON(text);
+}
+function gemFail(e,kicker,fallback){
+  const msg=GEM_ERR[e&&e.code]||(e&&e.code==='json'?'Gemini’s answer couldn’t be read. Try again.':'Couldn’t get an estimate'+(navigator.onLine?'':' while offline')+'. Try again or enter the numbers yourself.');
+  openSheet(`${head('No estimate',kicker)}<div class="note">${esc(msg)}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="manual">Enter manually</button></div>`,
+    b=>b.querySelector('#manual').onclick=()=>review({...fallback,type:'manual',kicker:'Manual entry'}));
+}
+const JSON_RULES='Reply with only one JSON object and no other text. Numbers are plain numbers without units. Protein in grams to at most 1 decimal place; calories as whole kcal.';
+
+async function estimateText(text,k,p){
+  const ac=new AbortController();busy('Estimating…','Typed entry',()=>ac.abort());
+  const prompt=`You estimate nutrition for a UK adult logging calories (kcal) and protein (g).
+Food eaten: "${text}"
+${k!=null?`The user says this was ${k} kcal. Use exactly that.\n`:''}${p!=null?`The user says this had ${p} g protein. Use exactly that.\n`:''}If it names a brand, chain or restaurant dish, use its published nutrition (search for it if you can). Otherwise assume typical UK portions and products. If amounts are given, use them.
+Return JSON: {"name": short tidy name (max 40 chars), "kcal": number, "protein": number, "items": [{"name": string, "kcal": number, "protein": number}] one per component, "confidence": "high"|"medium"|"low", "note": one short sentence stating the source or portion assumptions}
+${JSON_RULES}`;
+  let r;
+  try{try{r=await gemini([{text:prompt}],{search:true,signal:ac.signal})}catch(e){if(ac.signal.aborted||e.code==='nokey'||e.code===403)throw e;r=await gemini([{text:prompt}],{signal:ac.signal})}}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Typed entry',{name:text,src:'estimate',fixK:k,fixP:p});return}
+  if(ac.signal.aborted)return;onClose=null;
+  review({...r,name:r.name||text,type:'estimate',kicker:'Estimate',src:'estimate',fixK:k,fixP:p});
+}
+
+/* ===== barcode reading ===== */
+let zxingP=null;
+function loadZXing(){return zxingP||(zxingP=new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js';s.onload=()=>res(window.ZXing);s.onerror=rej;document.head.appendChild(s)}))}
+const FORMATS=['ean_13','ean_8','upc_a','upc_e'];
+async function detector(){if('BarcodeDetector' in window){try{const f=await BarcodeDetector.getSupportedFormats();if(FORMATS.some(x=>f.includes(x)))return new BarcodeDetector({formats:FORMATS.filter(x=>f.includes(x))})}catch(e){}}return null}
+async function decodeImage(blob){
+  try{const d=await detector();if(d){const bmp=await createImageBitmap(blob);const r=await d.detect(bmp);if(r[0])return r[0].rawValue}}catch(e){}
+  try{const Z=await loadZXing();const url=URL.createObjectURL(blob);try{const res=await new Z.BrowserMultiFormatReader().decodeFromImageUrl(url);return res.getText()}finally{URL.revokeObjectURL(url)}}catch(e){return null}
+}
+async function lookupCode(code,kicker){
+  const ac=new AbortController();busy('Looking up '+code,kicker||'Barcode',()=>ac.abort());
+  try{const r=await offBarcode(code,ac.signal);if(ac.signal.aborted)return;onClose=null;
+    if(r){review(r);return}
+    openSheet(`${head('Not in the database','Barcode '+esc(code))}<div class="note">Open Food Facts doesn’t have nutrition for this product yet. Take a photo of the nutrition label and it will be read instead.</div>
+      <div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="lbl">Photo the label</button></div>`,b=>b.querySelector('#lbl').onclick=()=>{closeSheet();setTimeout(()=>$('#camFile').click(),150)});
+  }catch(e){if(ac.signal.aborted)return;onClose=null;
+    openSheet(`${head('Lookup failed','Barcode '+esc(code))}<div class="note">${navigator.onLine?'Open Food Facts didn’t respond. Try again in a moment.':'You’re offline. Try again when you have signal.'}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="retry">Try again</button></div>`,b=>b.querySelector('#retry').onclick=()=>lookupCode(code,kicker))}
+}
+
+/* live scanner */
+async function scanSheet(){
+  addErr('');let stream=null,stop=false,zr=null,timer=null;
+  const cleanup=()=>{stop=true;clearTimeout(timer);if(zr)try{zr.reset()}catch(e){};if(stream)stream.getTracks().forEach(t=>t.stop())};
+  openSheet(`${head('Scan a barcode')}<div class="scanbox"><video id="vid" playsinline muted></video><div class="frame"></div></div>
+    <div class="note" id="scanMsg">Point the camera at the barcode.</div>
+    <div class="actions"><button class="secondary" id="torch" hidden>Torch</button><button class="secondary" data-close>Close</button></div>`,null,cleanup);
+  const vid=$('#vid'),found=code=>{if(stop)return;cleanup();try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}onClose=null;lookupCode(code,'Barcode '+code)};
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})}
+  catch(e){if(stop)return;$('#scanMsg').textContent='Camera access was blocked. Allow the camera for this site in Chrome’s settings, or use the photo button.';return}
+  if(stop){stream.getTracks().forEach(t=>t.stop());return}
+  vid.srcObject=stream;await vid.play().catch(()=>{});
+  const track=stream.getVideoTracks()[0];
+  try{if(track.getCapabilities&&track.getCapabilities().torch){const tb=$('#torch');tb.hidden=false;let on=false;tb.onclick=()=>{on=!on;track.applyConstraints({advanced:[{torch:on}]}).catch(()=>{});tb.textContent=on?'Torch off':'Torch'}}}catch(e){}
+  const d=await detector();
+  if(d){const loop=async()=>{if(stop)return;try{const r=await d.detect(vid);if(r[0]){found(r[0].rawValue);return}}catch(e){}timer=setTimeout(loop,200)};loop()}
+  else{try{const Z=await loadZXing();if(stop)return;zr=new Z.BrowserMultiFormatReader();zr.decodeFromStream(stream,vid,res=>{if(res)found(res.getText())})}catch(e){$('#scanMsg').textContent='Scanning isn’t supported here. Use the photo button instead.'}}
+}
+
+/* photos */
+async function prepImage(file){
+  try{const url=URL.createObjectURL(file);const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});
+    const sc=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');
+    c.width=Math.round(img.naturalWidth*sc);c.height=Math.round(img.naturalHeight*sc);c.getContext('2d').drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
+    return await new Promise(r=>c.toBlob(b=>r(b||file),'image/jpeg',0.85))}catch(e){return file}
+}
+const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(blob)});
+async function analysePhoto(file,note){
+  const ac=new AbortController();busy('Reading your photo…','Photo',()=>ac.abort());
+  const img=await prepImage(file);if(ac.signal.aborted)return;
+  const code=await decodeImage(img);if(ac.signal.aborted)return;
+  let missing='';
+  if(code){try{const r=await offBarcode(code,ac.signal);if(ac.signal.aborted)return;if(r){onClose=null;review(r);return}missing=code}catch(e){if(ac.signal.aborted)return}}
+  const prompt=`You help a UK adult log calories (kcal) and protein (g). The photo shows one of: a product barcode, food packaging (front of pack or nutrition label), or a plate or bowl of food.${note?`\nThe user added: "${note}". Take any amount they mention into account.`:''}${missing?`\nIts barcode (${missing}) is not in Open Food Facts.`:''}
+Rules:
+- If a nutrition label is readable, copy its figures (UK labels show per 100g/100ml and often per pack or serving).
+- If only the front of pack is visible, identify the product (brand, name, pack size) and use its typical published UK values with confidence "medium" or "low". If you cannot identify it, set type "unclear" and say in note what photo would help.
+- For a plate, identify each component, estimate portion sizes from visual cues and total them.
+Return JSON: {"type": "packaged"|"plate"|"unclear", "name": short tidy name (max 40 chars), "pack": {"size": number|null, "unit": "g"|"ml"|null, "kcal": number|null, "protein": number|null}, "per100": {"unit": "g"|"ml", "kcal": number, "protein": number} or null, "serving": {"label": short label like "1 bar", "kcal": number, "protein": number} or null, "items": [{"name": string, "kcal": number, "protein": number}] for plates, otherwise [], "kcal": best estimate of what was eaten (whole pack or plate unless the user said otherwise), "protein": number, "confidence": "high"|"medium"|"low", "note": one short sentence on what you read or assumed}
+${JSON_RULES}`;
+  let r;
+  try{r=await gemini([{text:prompt},{inline_data:{mime_type:img.type||'image/jpeg',data:await b64(img)}}],{signal:ac.signal})}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Photo',{name:note||'',src:'photo'});return}
+  if(ac.signal.aborted)return;onClose=null;
+  if(r.type==='unclear'&&num(r.kcal)==null){
+    openSheet(`${head('Couldn’t work that out','Photo')}<div class="note">${esc(r.note||'Try a photo of the nutrition label or the whole plate.')}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="again">Take another</button></div>`,
+      b=>b.querySelector('#again').onclick=()=>{closeSheet();setTimeout(()=>$('#camFile').click(),150)});return}
+  review({...r,kicker:r.type==='plate'?'Plate estimate':'Packaged food',src:'photo'});
+}
+function photoSheet(){
+  addErr('');
+  openSheet(`${head('Add from a photo')}
+    <label class="bigopt" for="camFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</label>
+    <label class="bigopt" for="galFile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="M20 15l-5-5-9 9"/></svg>Choose from gallery</label>
+    <div class="small">Works with a barcode, a nutrition label, the front of a pack, or a plate of food. Anything typed in the box is sent as a note, like “ate half”.</div>`);
+}
+['#camFile','#galFile'].forEach(s=>{const el=$(s);el.addEventListener('click',()=>{el.value=''});el.onchange=()=>{const f=el.files&&el.files[0];if(!f)return;const note=$('#desc').value.trim();$('#desc').value='';
+  analysePhoto(f,note)}});
+
+/* typed name search */
+async function nameSearch(text,k,p){
+  const ac=new AbortController();busy('Searching…','Food database',()=>ac.abort());
+  let list=[];try{list=await offSearch(text,ac.signal)}catch(e){}
+  if(ac.signal.aborted)return;onClose=null;
+  if(!list.length){estimateText(text,k,p);return}
+  const opt=r=>{const pk=r.per100&&r.pack.size?r.per100.kcal*r.pack.size/100:null;return pk!=null?fmt(pk)+' kcal/pack':r.serving?fmt(r.serving.kcal)+' kcal/serving':fmt(r.per100.kcal)+' kcal/100'+r.per100.unit};
+  openSheet(`${head('Matches for “'+esc(text)+'”','Food database')}<div class="list">${list.map((r,i)=>`<button class="row" data-m="${i}"><div class="nm" style="min-width:0">${esc(r.name)}</div><div class="vals small num" style="color:var(--muted)">${opt(r)}</div></button>`).join('')}
+    <button class="row" id="est"><span class="nm" style="color:var(--pro)">None of these, estimate it</span><span aria-hidden="true">›</span></button></div>`,
+  b=>{b.querySelectorAll('[data-m]').forEach(x=>x.onclick=()=>review({...list[+x.dataset.m],src:'search'}));b.querySelector('#est').onclick=()=>estimateText(text,k,p)});
+}
+
+/* ===== add bar ===== */
+$('#addBtn').onclick=()=>{
+  addErr('');const text=$('#desc').value.trim(),k=num($('#kIn').value),p=num($('#pIn').value);
+  if(!text&&k==null&&p==null){addErr('Type what you had, or enter the numbers.');return}
+  if(k!=null&&p!=null){addEntry({name:text||'Quick entry',kcal:k,protein:p,src:'typed'});clearBar();return}
+  if(!text){addErr('Add a description so the missing number can be found, or fill in both numbers.');return}
+  const pre=S.presets.find(x=>x.name.toLowerCase()===text.toLowerCase());
+  if(pre&&k==null&&p==null){usePreset(pre);clearBar();return}
+  clearBar();$('#desc').blur();
+  if(k==null&&p==null)nameSearch(text,k,p);else estimateText(text,k,p);
+};
+function clearBar(){$('#desc').value='';$('#kIn').value='';$('#pIn').value=''}
+$('#desc').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#addBtn').click()}});
+['#desc','#kIn','#pIn'].forEach(s=>$(s).addEventListener('input',()=>addErr('')));
+$('#scanBtn').onclick=scanSheet;$('#photoBtn').onclick=photoSheet;$('#presetBtn').onclick=()=>{addErr('');presetsSheet()};$('#settingsBtn').onclick=settingsSheet;
+
+/* ===== lists, edit, presets, settings ===== */
+document.addEventListener('click',e=>{
+  const row=e.target.closest('.row[data-id]');if(row&&!row.closest('#sheet')){editEntry(row.dataset.id);return}
+  const chip=e.target.closest('.chip[data-i]');if(chip){const c=S.chips[+chip.dataset.i];if(!c)return;
+    if(c.presetId){const p=S.presets.find(x=>x.id===c.presetId);if(p)usePreset(p)}else addEntry({name:c.name,kcal:c.kcal,protein:c.protein,src:'quick'});return}
+  const bar=e.target.closest('.bar[data-day]');if(bar){S.sel=S.sel===bar.dataset.day?null:bar.dataset.day;renderWeek();if(S.sel)$('#dayDetail').scrollIntoView({behavior:'smooth',block:'nearest'})}
+});
+function editEntry(id){
+  const en=S.entries.find(x=>x.id===id);if(!en)return;const ref=S.base.collection('entries').doc(id);
+  openSheet(`${head('Edit entry',dayLabel(en.day)+' · '+timeLabel(en.ts))}
+    <label class="f">Name<input id="eName" value="${esc(en.name)}"></label>
+    <div class="fields"><label class="f">Calories (kcal)<input id="eK" inputmode="numeric" value="${Math.round(en.kcal)}"></label><label class="f">Protein (g)<input id="eP" inputmode="decimal" value="${fmtP(en.protein)}"></label></div>
+    <div class="actions"><button class="secondary" id="eDup">Add again</button><button class="secondary" id="ePre">Save as preset</button></div>
+    <div class="actions"><button class="danger" id="eDel">Delete</button><button class="primary" id="eSave">Save</button></div>`,
+  b=>{const q=s=>b.querySelector(s),vals=()=>({name:q('#eName').value.trim()||en.name,kcal:num(q('#eK').value),protein:num(q('#eP').value)});
+    q('#eSave').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;ref.update({name:v.name,kcal:Math.round(v.kcal),protein:Math.round(v.protein*10)/10}).catch(()=>toast('Could not save.'));toast('Saved');closeSheet()};
+    q('#ePre').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;savePreset(v);toast('Saved as preset');closeSheet()};
+    q('#eDup').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;addEntry({...v,src:'quick'});closeSheet()};
+    const del=q('#eDel');del.onclick=()=>{if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Tap to confirm';return}
+      const{id:_,...data}=en;ref.delete().catch(()=>toast('Could not delete.'));toast('Deleted '+en.name,()=>ref.set(data));closeSheet()}});
+}
+function presetsSheet(){
+  const draw=(b,q)=>{const list=[...S.presets].filter(p=>!q||p.name.toLowerCase().includes(q)).sort((a,c)=>(c.uses||0)-(a.uses||0)||a.name.localeCompare(c.name));
+    b.querySelector('#plist').innerHTML=list.length?list.map(p=>`<div class="prow"><button class="row" data-pid="${esc(p.id)}"><div style="min-width:0"><div class="nm">${esc(p.name)}</div><div class="meta">${p.uses?'used '+p.uses+'×':'not used yet'}</div></div><div class="vals num"><b>${fmt(p.kcal)} kcal</b><span>${fmtP(p.protein)} g</span></div></button><button class="x" data-edit="${esc(p.id)}" aria-label="Edit ${esc(p.name)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg></button></div>`).join('')
+      :`<div class="empty">${q?'No presets match.':'No presets yet. Save things you have often, like your shake, and add them in one tap.'}</div>`};
+  openSheet(`${head('Presets')}<input id="pq" placeholder="Search presets" autocomplete="off"><div class="list" id="plist"></div><div class="actions"><button class="primary" id="pNew">New preset</button></div>`,
+  b=>{draw(b,'');b.querySelector('#pq').oninput=e=>draw(b,e.target.value.trim().toLowerCase());
+    b.querySelector('#plist').onclick=e=>{const ed=e.target.closest('[data-edit]');if(ed){presetForm(S.presets.find(p=>p.id===ed.dataset.edit));return}
+      const r=e.target.closest('[data-pid]');if(r){const p=S.presets.find(x=>x.id===r.dataset.pid);if(p){usePreset(p);closeSheet()}}};
+    b.querySelector('#pNew').onclick=()=>presetForm(null)});
+}
+function presetForm(p){
+  openSheet(`${head(p?'Edit preset':'New preset')}
+    <label class="f">Name<input id="fN" value="${esc(p?p.name:'')}" placeholder="Morning protein shake"></label>
+    <div class="fields"><label class="f">Calories (kcal)<input id="fK" inputmode="numeric" value="${p?Math.round(p.kcal):''}"></label><label class="f">Protein (g)<input id="fP" inputmode="decimal" value="${p?fmtP(p.protein):''}"></label></div>
+    <div class="err" id="fErr" hidden></div>
+    <div class="actions">${p?'<button class="danger" id="fDel">Delete</button>':'<button class="secondary" id="fBack">Back</button>'}<button class="primary" id="fSave">Save preset</button></div>`,
+  b=>{const q=s=>b.querySelector(s);
+    q('#fSave').onclick=()=>{const n=q('#fN').value.trim(),k=num(q('#fK').value),pr=num(q('#fP').value);
+      if(!n||k==null||pr==null){q('#fErr').textContent='Add a name, calories and protein.';q('#fErr').hidden=false;return}
+      savePreset({name:n,kcal:k,protein:pr},p&&p.id);toast('Preset saved');presetsSheet()};
+    if(q('#fBack'))q('#fBack').onclick=presetsSheet;
+    const d=q('#fDel');if(d)d.onclick=()=>{if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent='Tap to confirm';return}
+      S.base.collection('presets').doc(p.id).delete().catch(()=>toast('Could not delete.'));toast('Preset deleted');presetsSheet()}});
+}
+function settingsSheet(){
+  const u=auth.currentUser;
+  openSheet(`${head('Settings')}
+    <div class="kicker">Daily targets</div>
+    <div class="fields"><label class="f">Calorie limit (kcal)<input id="sK" inputmode="numeric" value="${S.settings.kcal}"></label><label class="f">Protein minimum (g)<input id="sP" inputmode="numeric" value="${S.settings.protein}"></label></div>
+    <div class="small">Calories are a ceiling to stay under. Protein is a floor to reach. Each day runs from 1am to 1am.</div>
+    <div class="kicker">Gemini (photo reading and estimates)</div>
+    <label class="f">API key<input id="sKey" type="password" autocomplete="off" placeholder="Paste key from Google AI Studio" value="${esc(lsGet('calpro.gemkey'))}"></label>
+    <label class="f">Model<input id="sModel" autocomplete="off" value="${esc(lsGet('calpro.model')||'gemini-flash-latest')}"></label>
+    <div class="small">The key is stored on this device only. Get one free at aistudio.google.com.</div>
+    <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div>
+    <div class="small">Signed in as ${esc(u&&(u.email||u.displayName)||'')} · <button id="sOut" style="text-decoration:underline;color:var(--over)">Sign out</button></div>`,
+  b=>{const q=s=>b.querySelector(s);
+    q('#sSave').onclick=()=>{const k=num(q('#sK').value),p=num(q('#sP').value);
+      lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
+      if(k&&p){S.settings={kcal:Math.round(k),protein:Math.round(p)};S.base.set({settings:S.settings},{merge:true}).catch(()=>toast('Could not save targets.'))}
+      if(lsGet('calpro.gemkey'))banner('');render();toast('Settings saved');closeSheet()};
+    q('#sOut').onclick=()=>{closeSheet();auth.signOut()}});
+}
+
+/* ===== day rollover and offline service worker ===== */
+function tick(){const t=dayKey(Date.now());if(t!==S.today){S.today=t;S.sel=null;if(S.base)subscribe();render()}}
+setInterval(tick,30000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)tick()});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
