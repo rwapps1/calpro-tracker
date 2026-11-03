@@ -96,8 +96,9 @@ section h2 small{font-family:var(--body);font-size:13px;color:var(--muted);font-
 .addbtn{background:var(--btn);color:var(--on-btn);border-radius:10px;padding:0 20px;height:44px;font-weight:600}
 .err{color:var(--over);font-size:13px}
 /* sheet */
-#scrim{position:fixed;inset:0;background:var(--scrim);z-index:30}
-#sheet{position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--surface);border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;
+#scrim{touch-action:none;position:fixed;inset:0;background:var(--scrim);z-index:30}
+html.locked,html.locked body{overflow:hidden;overscroll-behavior:none}
+#sheet{overscroll-behavior:contain;position:fixed;left:0;right:0;bottom:0;z-index:31;background:var(--surface);border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;
   padding:8px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));animation:up .22s ease}
 @keyframes up{from{transform:translateY(30px);opacity:.4}}
 @media (prefers-reduced-motion:reduce){#sheet{animation:none}.fill{transition:none}}
@@ -367,12 +368,12 @@ let sheetOpen=false,onClose=null;
 function openSheet(html,mount,close){
   if(onClose&&sheetOpen){const f=onClose;onClose=null;f()}
   $('#sheetBody').innerHTML=html;$('#sheet').hidden=false;$('#scrim').hidden=false;$('#sheet').scrollTop=0;onClose=close||null;
-  if(!sheetOpen){sheetOpen=true;history.pushState({sheet:1},'')}
+  if(!sheetOpen){sheetOpen=true;document.documentElement.classList.add('locked');history.pushState({sheet:1},'')}
   $('#sheetBody').querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeSheet());
   mount&&mount($('#sheetBody'));
 }
 function closeSheet(fromPop){
-  if(!sheetOpen)return;sheetOpen=false;$('#sheet').hidden=true;$('#scrim').hidden=true;
+  if(!sheetOpen)return;sheetOpen=false;document.documentElement.classList.remove('locked');$('#sheet').hidden=true;$('#scrim').hidden=true;
   if(onClose){const f=onClose;onClose=null;f()}
   if(!fromPop&&history.state&&history.state.sheet)history.back();
 }
@@ -473,7 +474,12 @@ async function gemini(parts,{search=false,signal}={}){
   const mine=lsGet('calpro.model')||'gemini-flash-latest';
   const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.2}};
   if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
-  if(search){setBusy('Searching Google for published figures…');return geminiOnce(mine,key,body,signal,20000)}
+  if(search){
+    const sm=[mine,...['gemini-2.5-flash','gemini-flash-lite-latest'].filter(m=>m!==mine)];let lastS;
+    for(const m of sm){setBusy('Searching Google for published figures'+(m===mine?'':' (trying '+m+')')+'…');
+      try{return await geminiOnce(m,key,body,signal,20000)}
+      catch(e){lastS=e;if(signal&&signal.aborted)throw e;if(e.code===429||e.code===404||e.code===503||e.code===500||e.code==='timeout')continue;throw e}}
+    throw lastS}
   const models=[mine,...FALLBACK_MODELS.filter(m=>m!==mine)];
   let last;
   for(const m of models){
@@ -583,17 +589,31 @@ ${JSON_RULES}`;
     let cancelled=false;busy('Finding the exact product…','Photo',()=>{cancelled=true});setBusy('Checking Open Food Facts for '+est.online+'…');
     let list=[];try{list=await offSearch(est.online)}catch(e){}
     if(cancelled)return;onClose=null;
-    if(list.length){showMatches('Is it one of these?','Food database',list,'None of these, use Gemini’s estimate',()=>review(est));return}
+    if(list.length){showMatches('Is it one of these?','Food database',list,'None of these, search online',()=>onlineThenReview(est));return}
+    onlineThenReview(est);return;
   }
   review(est);
 }
+/* tries published figures online; falls back to Gemini's estimate with a note saying so */
+async function onlineThenReview(est){
+  let cancelled=false;busy('Finding the exact product…','Photo',()=>{cancelled=true});
+  try{const r=await fetchOnline(est.online);if(cancelled)return;onClose=null;
+    if(r&&r.confidence==='high'&&(num(r.kcal)!=null||r.per100||r.serving)){review({...r,type:'packaged',kicker:'Published figures',src:'search'});return}
+    review({...est,online:null,note:(est.note?est.note+' ':'')+'No published figures found online, so these are typical values.'})}
+  catch(e){if(cancelled)return;onClose=null;
+    const why=e&&e.code===429?'Online search is over Gemini’s free limit right now':'Online search didn’t work this time';
+    review({...est,note:(est.note?est.note+' ':'')+why+', so these are typical values.'})}
+}
 /* look up a specific product's published figures with Google Search */
-async function lookupOnline(name){
-  const ac=new AbortController();busy('Searching online…',name,()=>ac.abort());
+function fetchOnline(name,signal){
   const prompt=`Find the published nutrition for this UK product: "${name}". Search for the manufacturer's or a UK retailer's nutrition information.
 Return JSON: {"type": "packaged", "name": short tidy name (max 40 chars), "pack": {"size": number|null, "unit": "g"|"ml"|null, "kcal": number|null, "protein": number|null}, "per100": {"unit": "g"|"ml", "kcal": number, "protein": number} or null, "serving": {"label": short label, "kcal": number, "protein": number} or null, "kcal": number for a typical serving, "protein": number, "confidence": "high" if taken from a published source, else "low", "note": one short sentence naming the source}
 ${JSON_RULES}`;
-  let r;try{r=await gemini([{text:prompt}],{search:true,signal:ac.signal})}
+  return gemini([{text:prompt}],{search:true,signal});
+}
+async function lookupOnline(name){
+  const ac=new AbortController();busy('Searching online…',name,()=>ac.abort());
+  let r;try{r=await fetchOnline(name,ac.signal)}
   catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Online lookup',{name,src:'photo'});return}
   if(ac.signal.aborted)return;onClose=null;
   review({...r,type:'packaged',kicker:'Published figures',src:'search'});
@@ -684,6 +704,16 @@ function presetForm(p){
     const d=q('#fDel');if(d)d.onclick=()=>{if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent='Tap to confirm';return}
       S.base.collection('presets').doc(p.id).delete().catch(()=>toast('Could not delete.'));toast('Preset deleted');presetsSheet()}});
 }
+function rulesSheet(){
+  const sec=(t,items)=>`<div><div class="kicker" style="margin-bottom:6px">${t}</div><ul style="margin:0;padding-left:18px;display:grid;gap:6px;font-size:14px">${items.map(i=>`<li>${i}</li>`).join('')}</ul></div>`;
+  openSheet(`${head('How data is found')}
+    ${sec('Scan',['Reads the barcode on your phone and looks it up in <b>Open Food Facts</b>. These are the product’s own figures, with no AI involved.','Not in the database: you’re asked to photograph the nutrition label instead.'])}
+    ${sec('Photo',['Barcode visible: looked up in <b>Open Food Facts</b> first.','Nutrition label visible: <b>Gemini</b> copies the label’s figures.','Front of pack only: Gemini names the product, then the app checks <b>Open Food Facts</b> for it. If it isn’t there, Gemini searches <b>Google</b> for the published figures. If nothing is found, you get Gemini’s typical values, and the note says so.','Plate of food: <b>Gemini</b> estimates each item from the photo.'])}
+    ${sec('Typing',['Description and both numbers: saved exactly as typed.','Exact name of a preset: the preset is added.','Description only: <b>Open Food Facts</b> is searched first. Tap a match, or choose to estimate.','Estimates: <b>Gemini</b> searches Google for published figures (useful for brands and chains). If that isn’t available, it estimates from typical UK portions.','One number typed: kept as you entered it, and Gemini fills in the other.'])}
+    ${sec('Good to know',['Every result opens on the review card first, so you can change the portion or numbers before saving.','Confidence: <b>high</b> means a label, database or published source. <b>Medium</b> or <b>low</b> means typical values or a visual estimate.','If Gemini is busy, the app retries and then tries backup models. Searching online uses a separate, smaller free allowance.'])}
+    <div class="actions"><button class="secondary" id="rBack">Back to Settings</button></div>`,
+  b=>b.querySelector('#rBack').onclick=settingsSheet);
+}
 function settingsSheet(){
   const u=auth.currentUser;
   openSheet(`${head('Settings')}
@@ -696,6 +726,7 @@ function settingsSheet(){
     <div class="small">The key is stored on this device only. Get one free at aistudio.google.com.</div>
     <button class="secondary" id="sTest" style="height:44px;border-radius:12px;font-weight:600">Test connections</button>
     <div class="small" id="sTestOut" style="white-space:pre-wrap"></div>
+    <button class="secondary" id="sRules" style="height:44px;border-radius:12px;font-weight:600">How data is found</button>
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div>
     <div class="small">Signed in as ${esc(u&&(u.email||u.displayName)||'')} · <button id="sOut" style="text-decoration:underline;color:var(--over)">Sign out</button></div>`,
   b=>{const q=s=>b.querySelector(s);
@@ -704,6 +735,7 @@ function settingsSheet(){
       if(k&&p){S.settings={kcal:Math.round(k),protein:Math.round(p)};S.base.set({settings:S.settings},{merge:true}).catch(()=>toast('Could not save targets.'))}
       if(lsGet('calpro.gemkey'))banner('');render();toast('Settings saved');closeSheet()};
     q('#sOut').onclick=()=>{closeSheet();auth.signOut()};
+    q('#sRules').onclick=rulesSheet;
     q('#sTest').onclick=async()=>{const out=q('#sTestOut'),log=m=>out.textContent+=m+'\n';out.textContent='';
       lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
       log('Food database (barcode)…');
