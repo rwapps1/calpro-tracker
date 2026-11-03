@@ -256,6 +256,11 @@ const fmtP=n=>{const r=Math.round((n||0)*10)/10;return Number.isInteger(r)?Strin
 const num=v=>{v=String(v??'').trim().replace(',','.');if(v==='')return null;const n=Number(v);return isFinite(n)&&n>=0?n:null};
 const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
 const lsSet=(k,v)=>{try{v?localStorage.setItem(k,v):localStorage.removeItem(k)}catch(e){}};
+function fetchT(url,opts={},ms=15000){const ac=new AbortController(),t=setTimeout(()=>ac.abort('timeout'),ms);
+  if(opts.signal){if(opts.signal.aborted)ac.abort();else opts.signal.addEventListener('abort',()=>ac.abort())}
+  return fetch(url,{...opts,signal:ac.signal}).catch(e=>{if(opts.signal&&opts.signal.aborted)throw e;throw{code:ac.signal.aborted?'timeout':'network',message:String(e&&e.message||e)}}).finally(()=>clearTimeout(t))}
+window.addEventListener('error',e=>{try{toast('App error: '+(e.message||'unknown'))}catch(_){}});
+window.addEventListener('unhandledrejection',e=>{try{const r=e.reason;toast('App error: '+(r&&(r.message||r.code)||r))}catch(_){}});
 const X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
 function dayKey(ts){const d=new Date(ts-3600000);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
@@ -437,33 +442,34 @@ function offToR(p,code){
   return{type:'packaged',name:name.slice(0,70),pack:{size,unit,kcal:null,protein:null},per100,serving,confidence:'high',note:'From Open Food Facts'+(per100&&p100==null?' (no protein figure listed)':''),kicker:'Food database',src:'barcode',code:code||p.code};
 }
 async function offBarcode(code,signal){
-  const r=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`,{signal});
+  const r=await fetchT(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_FIELDS}`,{signal},12000);
   if(r.status===404)return null;if(!r.ok)throw new Error('off '+r.status);
   const j=await r.json();return j.status===1||j.product?offToR(j.product,code):null;
 }
 async function offSearch(text,signal){
   const u=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(text)}&search_simple=1&action=process&json=1&page_size=20&sort_by=unique_scans_n&tagtype_0=countries&tag_contains_0=contains&tag_0=united-kingdom&fields=${OFF_FIELDS}`;
-  const r=await fetch(u,{signal});if(!r.ok)throw new Error('off '+r.status);
+  const r=await fetchT(u,{signal},10000);if(!r.ok)throw new Error('off '+r.status);
   const j=await r.json();return(j.products||[]).map(p=>offToR(p,p.code)).filter(Boolean).slice(0,8);
 }
 
 /* ===== Gemini (free key, stored on this device only) ===== */
-const GEM_ERR={nokey:'Add your free Gemini key in Settings to use estimates and photo reading.',429:'You’ve hit Gemini’s free limit for now. Try again later or enter the numbers yourself.',400:'Gemini rejected the request. Check the key and model in Settings.',403:'Gemini refused the key. Check it in Settings.',404:'That Gemini model wasn’t found. Check the model name in Settings.'};
+const GEM_ERR={timeout:'Gemini took too long to answer. Try again.',network:'Gemini couldn’t be reached. Check your connection.',nokey:'Add your free Gemini key in Settings to use estimates and photo reading.',429:'You’ve hit Gemini’s free limit for now. Try again later or enter the numbers yourself.',400:'Gemini rejected the request. Check the key and model in Settings.',403:'Gemini refused the key. Check it in Settings.',404:'That Gemini model wasn’t found. Check the model name in Settings.'};
 function parseJSON(t){t=String(t||'').replace(/```(?:json)?/gi,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw{code:'json'};return JSON.parse(t.slice(a,b+1))}
 async function gemini(parts,{search=false,signal}={}){
   const key=lsGet('calpro.gemkey');if(!key)throw{code:'nokey'};
   const model=lsGet('calpro.model')||'gemini-flash-latest';
   const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.2}};
   if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
-  const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal});
+  const res=await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal},60000);
   if(!res.ok){const j=await res.json().catch(()=>({}));throw{code:res.status,message:j.error&&j.error.message}}
   const j=await res.json();const text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('');
   return parseJSON(text);
 }
 function gemFail(e,kicker,fallback){
   const msg=GEM_ERR[e&&e.code]||(e&&e.code==='json'?'Gemini’s answer couldn’t be read. Try again.':'Couldn’t get an estimate'+(navigator.onLine?'':' while offline')+'. Try again or enter the numbers yourself.');
-  openSheet(`${head('No estimate',kicker)}<div class="note">${esc(msg)}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="manual">Enter manually</button></div>`,
+  const det=e&&(e.code!=null||e.message)?`<div class="small">Details: ${esc(String(e.code??''))} ${esc(String(e.message||'').slice(0,300))}</div>`:'';
+  openSheet(`${head('No estimate',kicker)}<div class="note">${esc(msg)}</div>${det}<div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="manual">Enter manually</button></div>`,
     b=>b.querySelector('#manual').onclick=()=>review({...fallback,type:'manual',kicker:'Manual entry'}));
 }
 const JSON_RULES='Reply with only one JSON object and no other text. Numbers are plain numbers without units. Protein in grams to at most 1 decimal place; calories as whole kcal.';
@@ -643,6 +649,8 @@ function settingsSheet(){
     <label class="f">API key<input id="sKey" type="password" autocomplete="off" placeholder="Paste key from Google AI Studio" value="${esc(lsGet('calpro.gemkey'))}"></label>
     <label class="f">Model<input id="sModel" autocomplete="off" value="${esc(lsGet('calpro.model')||'gemini-flash-latest')}"></label>
     <div class="small">The key is stored on this device only. Get one free at aistudio.google.com.</div>
+    <button class="secondary" id="sTest" style="height:44px;border-radius:12px;font-weight:600">Test connections</button>
+    <div class="small" id="sTestOut" style="white-space:pre-wrap"></div>
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div>
     <div class="small">Signed in as ${esc(u&&(u.email||u.displayName)||'')} · <button id="sOut" style="text-decoration:underline;color:var(--over)">Sign out</button></div>`,
   b=>{const q=s=>b.querySelector(s);
@@ -650,7 +658,18 @@ function settingsSheet(){
       lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
       if(k&&p){S.settings={kcal:Math.round(k),protein:Math.round(p)};S.base.set({settings:S.settings},{merge:true}).catch(()=>toast('Could not save targets.'))}
       if(lsGet('calpro.gemkey'))banner('');render();toast('Settings saved');closeSheet()};
-    q('#sOut').onclick=()=>{closeSheet();auth.signOut()}});
+    q('#sOut').onclick=()=>{closeSheet();auth.signOut()};
+    q('#sTest').onclick=async()=>{const out=q('#sTestOut'),log=m=>out.textContent+=m+'\n';out.textContent='';
+      lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
+      log('Food database (barcode)…');
+      try{const r=await offBarcode('5449000000996');log(r?'  OK: found '+r.name:'  Reached, but no product returned')}catch(e){log('  Failed: '+(e.code||'')+' '+(e.message||e))}
+      log('Food database (name search)…');
+      try{const l=await offSearch('banana');log('  OK: '+l.length+' matches')}catch(e){log('  Failed: '+(e.code||'')+' '+(e.message||e))}
+      log('Gemini ('+(lsGet('calpro.model')||'gemini-flash-latest')+')…');
+      try{const r=await gemini([{text:'Reply with only this JSON: {"ok": true}'}]);log(r&&r.ok?'  OK':'  Odd reply: '+JSON.stringify(r).slice(0,120))}catch(e){log('  Failed: '+(e.code??'')+' '+String(e.message||'').slice(0,300))}
+      log('Gemini with Google Search…');
+      try{await gemini([{text:'Reply with only this JSON: {"ok": true}'}],{search:true});log('  OK')}catch(e){log('  Failed: '+(e.code??'')+' '+String(e.message||'').slice(0,200))}
+    }});
 }
 
 /* ===== day rollover and offline service worker ===== */
