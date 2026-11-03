@@ -14,7 +14,7 @@
 :root{
   --bg:#f2f3ef;--surface:#ffffff;--surface-2:#f6f7f3;--ink:#171a18;--muted:#5d655f;--line:#dcdfd8;
   --kcal:#c4740c;--kcal-soft:#fbecd3;--pro:#16766a;--pro-soft:#d5ede7;--over:#b8322a;--over-soft:#f8dcd9;
-  --btn:#173404;--on-btn:#ffffff;--scrim:rgba(10,12,11,.45);
+  --btn:#173404;--on-btn:#ffffff;--scrim:rgba(10,12,11,.45);--bar:#dfe9d3;--bar-edge:#173404;--bar-ink:#173404;
   --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
   --body:"Figtree","Segoe UI",Roboto,system-ui,sans-serif;
   color-scheme:light;
@@ -22,11 +22,11 @@
 @media (prefers-color-scheme:dark){:root{
   --bg:#0f130f;--surface:#181d18;--surface-2:#141914;--ink:#ecefea;--muted:#9ba49d;--line:#2b322c;
   --kcal:#f0a63a;--kcal-soft:#3a2a12;--pro:#4cc4ab;--pro-soft:#13332c;--over:#ff7c6e;--over-soft:#3d1c19;
-  --btn:#cfe8b8;--on-btn:#10200a;--scrim:rgba(0,0,0,.6);color-scheme:dark}}
+  --btn:#cfe8b8;--on-btn:#10200a;--scrim:rgba(0,0,0,.6);--bar:#1d2b17;--bar-edge:#6f9f4f;--bar-ink:#cfe8b8;color-scheme:dark}}
 *{box-sizing:border-box}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45;-webkit-tap-highlight-color:transparent;
-  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(150px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(185px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
 main{max-width:560px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 [hidden]{display:none!important}
 button,label.btnlike{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -61,7 +61,7 @@ section h2 small{font-family:var(--body);font-size:13px;color:var(--muted);font-
 .empty{padding:18px 14px;color:var(--muted);font-size:14px}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
-.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-size:14px;min-height:40px;white-space:nowrap}
+.chip{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:8px 14px;font-size:14px;min-height:40px;white-space:nowrap}
 .chip em{font-style:normal;color:var(--muted);font-size:12px;margin-left:4px}
 .week{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
 .avg{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-bottom:10px}
@@ -88,9 +88,11 @@ section h2 small{font-family:var(--body);font-size:13px;color:var(--muted);font-
 .signin h1{font-family:var(--display);margin:0;font-size:28px}
 .signin form{display:grid;gap:10px;text-align:left}
 /* add bar */
-.addbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--surface);border-top:1px solid var(--line);
+.addbar{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bar);border-top:3px solid var(--bar-edge);border-radius:18px 18px 0 0;
   padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
 .addbar .in{max-width:560px;margin:0 auto;display:grid;gap:8px}
+.addlabel{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--bar-ink)}
+.addlabel svg{width:16px;height:16px}
 .r1{display:flex;gap:8px}
 .r2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px}
 .addbtn{background:var(--btn);color:var(--on-btn);border-radius:10px;padding:0 20px;height:44px;font-weight:600}
@@ -138,7 +140,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 .scanbox video{width:100%;height:100%;object-fit:cover;display:block}
 .scanbox .frame{position:absolute;left:12%;right:12%;top:36%;height:28%;border:2px solid #f1efe8;border-radius:12px}
 .scanbox .frame::after{content:"";position:absolute;left:8px;right:8px;top:50%;border-top:2px solid #EF9F27}
-#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(140px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(175px + env(safe-area-inset-bottom,0px));z-index:40;background:var(--ink);color:var(--bg);
   border-radius:12px;padding:10px 14px;font-size:14px;display:flex;gap:14px;align-items:center;max-width:calc(100% - 32px)}
 #toast button{color:var(--bg);font-weight:700;text-decoration:underline;min-height:32px}
 .small{font-size:12px;color:var(--muted)}
@@ -185,7 +187,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
   </div>
 
   <section id="quickSec" hidden>
-    <h2>Quick add <small>tap to log</small></h2>
+    <h2>Quick add <small>tap to log · hold to remove</small></h2>
     <div class="chips" id="chips"></div>
   </section>
 
@@ -208,6 +210,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 
 <div class="addbar" id="addbar" hidden>
   <div class="in">
+    <div class="addlabel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add food</div>
     <div class="r1">
       <input id="desc" placeholder="Tesco chicken wrap" autocomplete="off" enterkeyhint="done">
       <button class="iconbtn" id="scanBtn" aria-label="Scan a barcode">
@@ -270,7 +273,7 @@ function addDays(k,n){const d=keyDate(k);d.setDate(d.getDate()+n);return dayKey(
 const dayLabel=(k,o)=>keyDate(k).toLocaleDateString('en-GB',o||{weekday:'short',day:'numeric',month:'short'});
 const timeLabel=ts=>new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 
-const S={base:null,entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
+const S={base:null,hidden:[],entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
 const SRC={typed:'typed',estimate:'estimated',photo:'photo',barcode:'barcode',search:'food database',preset:'preset',quick:'quick add'};
 
 /* ===== Firebase ===== */
@@ -283,7 +286,7 @@ auth.onAuthStateChanged(u=>{
   if(!u){$('#signin').hidden=false;$('#app').hidden=true;$('#addbar').hidden=true;return}
   $('#signin').hidden=true;$('#app').hidden=false;$('#addbar').hidden=false;
   S.base=db.collection('calpro').doc(u.uid);
-  S.unsub.push(S.base.onSnapshot(s=>{const d=s.data();if(d&&d.settings&&d.settings.kcal){S.settings={kcal:+d.settings.kcal,protein:+d.settings.protein};render()}},()=>{}));
+  S.unsub.push(S.base.onSnapshot(s=>{const d=s.data()||{};if(d.settings&&d.settings.kcal)S.settings={kcal:+d.settings.kcal,protein:+d.settings.protein};S.hidden=Array.isArray(d.hiddenChips)?d.hiddenChips:[];render()},()=>{}));
   S.unsub.push(S.base.collection('presets').onSnapshot(s=>{S.presets=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{}));
   subscribe();
   if(!lsGet('calpro.gemkey'))banner('Add your free Gemini key in Settings to read photos and estimate food. <button id="bKey">Open Settings</button>',()=>$('#bKey').onclick=settingsSheet);
@@ -335,12 +338,30 @@ function render(){
   renderChips();renderWeek();
 }
 function renderChips(){
-  const used=[...S.presets].sort((a,b)=>(b.lastUsed||0)-(a.lastUsed||0)||(b.uses||0)-(a.uses||0)).slice(0,5).map(p=>({name:p.name,kcal:p.kcal,protein:p.protein,presetId:p.id}));
-  const names=new Set(used.map(u=>u.name.toLowerCase())),recent=[];
+  const hid=new Set(S.hidden);
+  const used=[...S.presets].filter(p=>!hid.has(p.name.toLowerCase())).sort((a,b)=>(b.lastUsed||0)-(a.lastUsed||0)||(b.uses||0)-(a.uses||0)).slice(0,5).map(p=>({name:p.name,kcal:p.kcal,protein:p.protein,presetId:p.id}));
+  const names=new Set([...used.map(u=>u.name.toLowerCase()),...hid]),recent=[];
   for(const e of [...S.entries].sort((a,b)=>b.ts-a.ts)){const n=e.name.toLowerCase();if(!names.has(n)){names.add(n);recent.push({name:e.name,kcal:e.kcal,protein:e.protein})}if(recent.length>=4)break}
   S.chips=[...used,...recent];$('#quickSec').hidden=!S.chips.length;
   $('#chips').innerHTML=S.chips.map((c,i)=>`<button class="chip" data-i="${i}">+ ${esc(c.name)}<em class="num">${fmt(c.kcal)}</em></button>`).join('');
 }
+/* press and hold a Quick add chip */
+let holdT=null,holdFired=false,holdXY=null;
+function chipMenu(c){
+  openSheet(`${head(esc(c.name),'Quick add')}<div class="note num">${fmt(c.kcal)} kcal · ${fmtP(c.protein)} g protein${c.presetId?' · preset':''}</div>
+    <div class="actions"><button class="secondary" id="cAdd">Add now</button><button class="danger" id="cHide">Remove from Quick add</button></div>
+    <div class="small">${c.presetId?'The preset stays in your presets list.':'Your logged entries aren’t changed.'} Hidden items can be restored in Settings.</div>`,
+  b=>{b.querySelector('#cAdd').onclick=()=>{closeSheet();if(c.presetId){const p=S.presets.find(x=>x.id===c.presetId);if(p)usePreset(p)}else addEntry({name:c.name,kcal:c.kcal,protein:c.protein,src:'quick'})};
+    b.querySelector('#cHide').onclick=()=>{const n=c.name.toLowerCase();if(!S.hidden.includes(n)){S.hidden=[...S.hidden,n];render();
+      S.base.set({hiddenChips:firebase.firestore.FieldValue.arrayUnion(n)},{merge:true}).catch(()=>toast('Could not save that change.'))}
+      closeSheet();toast('Removed from Quick add',()=>{S.hidden=S.hidden.filter(x=>x!==n);render();S.base.set({hiddenChips:firebase.firestore.FieldValue.arrayRemove(n)},{merge:true}).catch(()=>{})})}});
+}
+const chipsEl=document.getElementById('chips');
+chipsEl.addEventListener('pointerdown',e=>{const ch=e.target.closest('.chip[data-i]');if(!ch)return;holdFired=false;holdXY=[e.clientX,e.clientY];clearTimeout(holdT);
+  holdT=setTimeout(()=>{holdFired=true;try{navigator.vibrate&&navigator.vibrate(30)}catch(_){}const c=S.chips[+ch.dataset.i];if(c)chipMenu(c)},500)});
+chipsEl.addEventListener('pointermove',e=>{if(holdXY&&Math.hypot(e.clientX-holdXY[0],e.clientY-holdXY[1])>10)clearTimeout(holdT)});
+['pointerup','pointercancel','pointerleave'].forEach(t=>chipsEl.addEventListener(t,()=>clearTimeout(holdT)));
+chipsEl.addEventListener('contextmenu',e=>{if(e.target.closest('.chip'))e.preventDefault()});
 function renderWeek(){
   const st=S.settings,days=[];for(let i=6;i>=0;i--)days.push(addDays(S.today,-i));
   const tots=days.map(totals),maxK=Math.max(st.kcal*1.15,...tots.map(t=>t.k),1);
@@ -459,12 +480,20 @@ async function offSearch(text,signal){
 /* ===== Gemini (free key, stored on this device only) ===== */
 const GEM_ERR={503:'Gemini is busy right now (all models tried). Try again in a minute or enter the numbers yourself.',500:'Gemini had a problem on its side. Try again in a minute.',timeout:'Gemini took too long to answer. Try again.',network:'Gemini couldn’t be reached. Check your connection.',nokey:'Add your free Gemini key in Settings to use estimates and photo reading.',429:'You’ve hit Gemini’s free limit for now. Try again later or enter the numbers yourself.',400:'Gemini rejected the request. Check the key and model in Settings.',403:'Gemini refused the key. Check it in Settings.',404:'That Gemini model wasn’t found. Check the model name in Settings.'};
 function parseJSON(t){t=String(t||'').replace(/```(?:json)?/gi,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw{code:'json'};return JSON.parse(t.slice(a,b+1))}
-const FALLBACK_MODELS=['gemini-flash-latest','gemini-flash-lite-latest','gemini-2.5-flash'];
+const FALLBACK_MODELS=['gemini-flash-latest','gemini-2.5-flash','gemini-flash-lite-latest','gemini-2.5-flash-lite','gemini-2.0-flash'];
+/* models that ran out of free allowance are skipped until Google's reset (midnight Pacific time) */
+function msToPacificMidnight(){try{const f=new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',hour:'numeric',minute:'numeric',second:'numeric',hourCycle:'h23'}).formatToParts(new Date());
+  const g=t=>+f.find(x=>x.type===t).value;return((24-g('hour'))*3600-g('minute')*60-g('second'))*1000+60000}catch(e){return 6*3600000}}
+function spentMap(){try{return JSON.parse(lsGet('calpro.spent')||'{}')}catch(e){return{}}}
+function isSpent(k){const m=spentMap();return m[k]&&m[k]>Date.now()}
+function markSpent(k,e){const daily=/PerDay|per day|daily/i.test(String(e&&e.details||'')+String(e&&e.message||''));const m=spentMap();
+  m[k]=Date.now()+(daily?msToPacificMidnight():60000);for(const x in m)if(m[x]<=Date.now())delete m[x];lsSet('calpro.spent',JSON.stringify(m))}
+function spentList(){const m=spentMap(),now=Date.now();return Object.keys(m).filter(k=>m[k]>now).map(k=>k+' (until '+new Date(m[k]).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+')')}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function geminiOnce(model,key,body,signal,ms=30000){
   const res=await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
     {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal},ms);
-  if(!res.ok){const j=await res.json().catch(()=>({}));throw{code:res.status,message:j.error&&j.error.message}}
+  if(!res.ok){const j=await res.json().catch(()=>({}));throw{code:res.status,message:j.error&&j.error.message,details:JSON.stringify(j.error&&j.error.details||'')}}
   const j=await res.json();const text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('');
   return parseJSON(text);
 }
@@ -475,13 +504,13 @@ async function gemini(parts,{search=false,signal}={}){
   const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.2}};
   if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
   if(search){
-    const sm=[mine,...['gemini-2.5-flash','gemini-flash-lite-latest'].filter(m=>m!==mine)];let lastS;
+    const sm=[mine,...FALLBACK_MODELS.filter(m=>m!==mine)].filter(m=>!isSpent(m)&&!isSpent(m+':search'));let lastS={code:429,message:'Every model’s free Google Search allowance is used up until Google resets it.'};
     for(const m of sm){setBusy('Searching Google for published figures'+(m===mine?'':' (trying '+m+')')+'…');
       try{return await geminiOnce(m,key,body,signal,20000)}
-      catch(e){lastS=e;if(signal&&signal.aborted)throw e;if(e.code===429||e.code===404||e.code===503||e.code===500||e.code==='timeout')continue;throw e}}
+      catch(e){lastS=e;if(signal&&signal.aborted)throw e;if(e.code===429){markSpent(m+':search',e);continue}if(e.code===404||e.code===503||e.code===500||e.code==='timeout')continue;throw e}}
     throw lastS}
-  const models=[mine,...FALLBACK_MODELS.filter(m=>m!==mine)];
-  let last;
+  const models=[mine,...FALLBACK_MODELS.filter(m=>m!==mine)].filter(m=>!isSpent(m));
+  let last={code:429,message:'Every Gemini model’s free allowance is used up until Google resets it.'};
   for(const m of models){
     for(let attempt=0;attempt<2;attempt++){
       setBusy(attempt?'Gemini busy, retrying '+m+'…':(m===mine?'Asking Gemini…':'Gemini busy, trying backup model '+m+'…'));
@@ -489,7 +518,8 @@ async function gemini(parts,{search=false,signal}={}){
       catch(e){last=e;if(signal&&signal.aborted)throw e;
         const busy=e.code===503||e.code===500||e.code==='timeout';
         if(busy&&attempt===0){await sleep(1500);continue}
-        if(busy||e.code===429||e.code===404)break;
+        if(e.code===429){markSpent(m,e);break}
+        if(busy||e.code===404)break;
         throw e}
     }
   }
@@ -662,7 +692,7 @@ $('#scanBtn').onclick=scanSheet;$('#photoBtn').onclick=photoSheet;$('#presetBtn'
 /* ===== lists, edit, presets, settings ===== */
 document.addEventListener('click',e=>{
   const row=e.target.closest('.row[data-id]');if(row&&!row.closest('#sheet')){editEntry(row.dataset.id);return}
-  const chip=e.target.closest('.chip[data-i]');if(chip){const c=S.chips[+chip.dataset.i];if(!c)return;
+  const chip=e.target.closest('.chip[data-i]');if(chip){if(holdFired){holdFired=false;return}const c=S.chips[+chip.dataset.i];if(!c)return;
     if(c.presetId){const p=S.presets.find(x=>x.id===c.presetId);if(p)usePreset(p)}else addEntry({name:c.name,kcal:c.kcal,protein:c.protein,src:'quick'});return}
   const bar=e.target.closest('.bar[data-day]');if(bar){S.sel=S.sel===bar.dataset.day?null:bar.dataset.day;renderWeek();if(S.sel)$('#dayDetail').scrollIntoView({behavior:'smooth',block:'nearest'})}
 });
@@ -727,6 +757,7 @@ function settingsSheet(){
     <button class="secondary" id="sTest" style="height:44px;border-radius:12px;font-weight:600">Test connections</button>
     <div class="small" id="sTestOut" style="white-space:pre-wrap"></div>
     <button class="secondary" id="sRules" style="height:44px;border-radius:12px;font-weight:600">How data is found</button>
+    ${S.hidden.length?`<button class="secondary" id="sUnhide" style="height:44px;border-radius:12px;font-weight:600">Restore hidden Quick add items (${S.hidden.length})</button>`:''}
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div>
     <div class="small">Signed in as ${esc(u&&(u.email||u.displayName)||'')} · <button id="sOut" style="text-decoration:underline;color:var(--over)">Sign out</button></div>`,
   b=>{const q=s=>b.querySelector(s);
@@ -736,6 +767,7 @@ function settingsSheet(){
       if(lsGet('calpro.gemkey'))banner('');render();toast('Settings saved');closeSheet()};
     q('#sOut').onclick=()=>{closeSheet();auth.signOut()};
     q('#sRules').onclick=rulesSheet;
+    if(q('#sUnhide'))q('#sUnhide').onclick=()=>{S.hidden=[];render();S.base.set({hiddenChips:[]},{merge:true}).catch(()=>toast('Could not save that change.'));toast('Quick add items restored');q('#sUnhide').remove()};
     q('#sTest').onclick=async()=>{const out=q('#sTestOut'),log=m=>out.textContent+=m+'\n';out.textContent='';
       lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
       log('Food database (barcode)…');
@@ -744,6 +776,7 @@ function settingsSheet(){
       try{const l=await offSearch('banana');log('  OK: '+l.length+' matches')}catch(e){log('  Failed: '+(e.code||'')+' '+(e.message||e))}
       log('Gemini ('+(lsGet('calpro.model')||'gemini-flash-latest')+')…');
       try{const r=await gemini([{text:'Reply with only this JSON: {"ok": true}'}]);log(r&&r.ok?'  OK':'  Odd reply: '+JSON.stringify(r).slice(0,120))}catch(e){log('  Failed: '+(e.code??'')+' '+String(e.message||'').slice(0,300))}
+      const sp=spentList();log('Skipped until reset: '+(sp.length?sp.join(', '):'none'));
       log('Gemini with Google Search…');
       try{await gemini([{text:'Reply with only this JSON: {"ok": true}'}],{search:true});log('  OK')}catch(e){log('  Failed: '+(e.code??'')+' '+String(e.message||'').slice(0,200))}
     }});
