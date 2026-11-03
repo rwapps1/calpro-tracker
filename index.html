@@ -379,7 +379,8 @@ function closeSheet(fromPop){
 window.addEventListener('popstate',()=>{if(sheetOpen)closeSheet(true)});
 $('#scrim').onclick=()=>closeSheet();
 const head=(t,k)=>`<div class="sh"><div style="min-width:0">${k?`<div class="kicker">${k}</div>`:''}<h3>${t}</h3></div><button class="x" data-close aria-label="Close">${X}</button></div>`;
-function busy(label,kicker,onCancel){openSheet(`${head(label,kicker)}<div class="spin" role="status" aria-label="Working"></div><div class="actions"><button class="secondary" data-close>Cancel</button></div>`,null,onCancel)}
+function setBusy(t){const el=document.getElementById('busyMsg');if(el)el.textContent=t}
+function busy(label,kicker,onCancel){openSheet(`${head(label,kicker)}<div class="spin" role="status" aria-label="Working"></div><div class="note" id="busyMsg" style="text-align:center"></div><div class="actions"><button class="secondary" data-close>Cancel</button></div>`,null,onCancel)}
 
 /* ===== review card ===== */
 const confStyle=c=>c==='high'?'background:var(--pro-soft);color:var(--pro)':c==='low'?'background:var(--over-soft);color:var(--over)':'background:var(--kcal-soft);color:var(--kcal)';
@@ -404,6 +405,7 @@ function review(r){
     <label class="f" id="amtWrap" hidden><span id="amtLbl">Amount</span><input id="amt" inputmode="decimal" placeholder="150"></label>
     <label class="f">Name<input id="rName" value="${esc(r.name||'')}"></label>
     <div class="fields"><label class="f">Calories (kcal)<input id="rK" inputmode="numeric"></label><label class="f">Protein (g)<input id="rP" inputmode="decimal"></label></div>
+    ${r.online?`<button class="secondary" id="rOnline" style="height:44px;border-radius:12px;font-weight:600">Search online for exact figures</button>`:''}
     <label class="check"><input type="checkbox" id="rPreset"> Also save as a preset</label>
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="rAdd">Add to today</button></div>`,
   b=>{
@@ -414,6 +416,7 @@ function review(r){
       if(o.amt){q('#amtLbl').textContent='Amount ('+o.u+')';if(num(q('#amt').value)!=null)fromAmt();else setTimeout(()=>q('#amt').focus(),60)}else setVals(o.k,o.p)};
     b.querySelectorAll('.opt').forEach(x=>x.onclick=()=>pick(+x.dataset.o));
     q('#amt').oninput=fromAmt;pick(sel);
+    if(q('#rOnline'))q('#rOnline').onclick=()=>lookupOnline(r.online);
     if(r.fixK!=null)q('#rK').value=Math.round(r.fixK);if(r.fixP!=null)q('#rP').value=fmtP(r.fixP);
     q('#rAdd').onclick=()=>{
       const k=num(q('#rK').value),p=num(q('#rP').value),n=q('#rName').value.trim()||r.name||'Entry';
@@ -457,9 +460,9 @@ const GEM_ERR={503:'Gemini is busy right now (all models tried). Try again in a 
 function parseJSON(t){t=String(t||'').replace(/```(?:json)?/gi,'');const a=t.indexOf('{'),b=t.lastIndexOf('}');if(a<0||b<a)throw{code:'json'};return JSON.parse(t.slice(a,b+1))}
 const FALLBACK_MODELS=['gemini-flash-latest','gemini-flash-lite-latest','gemini-2.5-flash'];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-async function geminiOnce(model,key,body,signal){
+async function geminiOnce(model,key,body,signal,ms=30000){
   const res=await fetchT(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`,
-    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal},30000);
+    {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal},ms);
   if(!res.ok){const j=await res.json().catch(()=>({}));throw{code:res.status,message:j.error&&j.error.message}}
   const j=await res.json();const text=((j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[]).map(p=>p.text||'').join('');
   return parseJSON(text);
@@ -470,11 +473,12 @@ async function gemini(parts,{search=false,signal}={}){
   const mine=lsGet('calpro.model')||'gemini-flash-latest';
   const body={contents:[{role:'user',parts}],generationConfig:{temperature:0.2}};
   if(search)body.tools=[{google_search:{}}];else body.generationConfig.responseMimeType='application/json';
-  if(search)return geminiOnce(mine,key,body,signal);
+  if(search){setBusy('Searching Google for published figures…');return geminiOnce(mine,key,body,signal,20000)}
   const models=[mine,...FALLBACK_MODELS.filter(m=>m!==mine)];
   let last;
   for(const m of models){
     for(let attempt=0;attempt<2;attempt++){
+      setBusy(attempt?'Gemini busy, retrying '+m+'…':(m===mine?'Asking Gemini…':'Gemini busy, trying backup model '+m+'…'));
       try{return await geminiOnce(m,key,body,signal)}
       catch(e){last=e;if(signal&&signal.aborted)throw e;
         const busy=e.code===503||e.code===500||e.code==='timeout';
@@ -513,7 +517,7 @@ function loadZXing(){return zxingP||(zxingP=new Promise((res,rej)=>{const s=docu
 const FORMATS=['ean_13','ean_8','upc_a','upc_e'];
 async function detector(){if('BarcodeDetector' in window){try{const f=await BarcodeDetector.getSupportedFormats();if(FORMATS.some(x=>f.includes(x)))return new BarcodeDetector({formats:FORMATS.filter(x=>f.includes(x))})}catch(e){}}return null}
 async function decodeImage(blob){
-  try{const d=await detector();if(d){const bmp=await createImageBitmap(blob);const r=await d.detect(bmp);if(r[0])return r[0].rawValue}}catch(e){}
+  try{const d=await detector();if(d){const bmp=await createImageBitmap(blob);const r=await d.detect(bmp);return r[0]?r[0].rawValue:null}}catch(e){}
   try{const Z=await loadZXing();const url=URL.createObjectURL(blob);try{const res=await new Z.BrowserMultiFormatReader().decodeFromImageUrl(url);return res.getText()}finally{URL.revokeObjectURL(url)}}catch(e){return null}
 }
 async function lookupCode(code,kicker){
@@ -555,16 +559,16 @@ async function prepImage(file){
 const b64=blob=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(blob)});
 async function analysePhoto(file,note){
   const ac=new AbortController();busy('Reading your photo…','Photo',()=>ac.abort());
-  const img=await prepImage(file);if(ac.signal.aborted)return;
-  const code=await decodeImage(img);if(ac.signal.aborted)return;
+  setBusy('Preparing photo…');const img=await prepImage(file);if(ac.signal.aborted)return;
+  setBusy('Checking for a barcode…');const code=await decodeImage(img);if(ac.signal.aborted)return;
   let missing='';
-  if(code){try{const r=await offBarcode(code,ac.signal);if(ac.signal.aborted)return;if(r){onClose=null;review(r);return}missing=code}catch(e){if(ac.signal.aborted)return}}
+  if(code){setBusy('Looking up barcode '+code+'…');try{const r=await offBarcode(code,ac.signal);if(ac.signal.aborted)return;if(r){onClose=null;review(r);return}missing=code}catch(e){if(ac.signal.aborted)return}}
   const prompt=`You help a UK adult log calories (kcal) and protein (g). The photo shows one of: a product barcode, food packaging (front of pack or nutrition label), or a plate or bowl of food.${note?`\nThe user added: "${note}". Take any amount they mention into account.`:''}${missing?`\nIts barcode (${missing}) is not in Open Food Facts.`:''}
 Rules:
 - If a nutrition label is readable, copy its figures (UK labels show per 100g/100ml and often per pack or serving).
 - If only the front of pack is visible, identify the product (brand, name, pack size) and use its typical published UK values with confidence "medium" or "low". If you cannot identify it, set type "unclear" and say in note what photo would help.
 - For a plate, identify each component, estimate portion sizes from visual cues and total them.
-Return JSON: {"type": "packaged"|"plate"|"unclear", "name": short tidy name (max 40 chars), "pack": {"size": number|null, "unit": "g"|"ml"|null, "kcal": number|null, "protein": number|null}, "per100": {"unit": "g"|"ml", "kcal": number, "protein": number} or null, "serving": {"label": short label like "1 bar", "kcal": number, "protein": number} or null, "items": [{"name": string, "kcal": number, "protein": number}] for plates, otherwise [], "kcal": best estimate of what was eaten (whole pack or plate unless the user said otherwise), "protein": number, "confidence": "high"|"medium"|"low", "note": one short sentence on what you read or assumed}
+Return JSON: {"type": "packaged"|"plate"|"unclear", "name": short tidy name (max 40 chars), "search": for packaged products, the brand and product name to search a food database with (e.g. "Ron Miel honey rum"), else null, "fromLabel": true if you read the figures from a visible nutrition label, else false, "pack": {"size": number|null, "unit": "g"|"ml"|null, "kcal": number|null, "protein": number|null}, "per100": {"unit": "g"|"ml", "kcal": number, "protein": number} or null, "serving": {"label": short label like "1 bar", "kcal": number, "protein": number} or null, "items": [{"name": string, "kcal": number, "protein": number}] for plates, otherwise [], "kcal": best estimate of what was eaten (whole pack or plate unless the user said otherwise), "protein": number, "confidence": "high"|"medium"|"low", "note": one short sentence on what you read or assumed}
 ${JSON_RULES}`;
   let r;
   try{r=await gemini([{text:prompt},{inline_data:{mime_type:img.type||'image/jpeg',data:await b64(img)}}],{signal:ac.signal})}
@@ -573,7 +577,32 @@ ${JSON_RULES}`;
   if(r.type==='unclear'&&num(r.kcal)==null){
     openSheet(`${head('Couldn’t work that out','Photo')}<div class="note">${esc(r.note||'Try a photo of the nutrition label or the whole plate.')}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="again">Take another</button></div>`,
       b=>b.querySelector('#again').onclick=()=>{closeSheet();setTimeout(()=>$('#camFile').click(),150)});return}
-  review({...r,kicker:r.type==='plate'?'Plate estimate':'Packaged food',src:'photo'});
+  const est={...r,kicker:r.type==='plate'?'Plate estimate':'Packaged food',src:'photo'};
+  if(r.type==='packaged'&&!r.fromLabel&&(r.search||r.name)){
+    est.online=r.search||r.name;
+    let cancelled=false;busy('Finding the exact product…','Photo',()=>{cancelled=true});setBusy('Checking Open Food Facts for '+est.online+'…');
+    let list=[];try{list=await offSearch(est.online)}catch(e){}
+    if(cancelled)return;onClose=null;
+    if(list.length){showMatches('Is it one of these?','Food database',list,'None of these, use Gemini’s estimate',()=>review(est));return}
+  }
+  review(est);
+}
+/* look up a specific product's published figures with Google Search */
+async function lookupOnline(name){
+  const ac=new AbortController();busy('Searching online…',name,()=>ac.abort());
+  const prompt=`Find the published nutrition for this UK product: "${name}". Search for the manufacturer's or a UK retailer's nutrition information.
+Return JSON: {"type": "packaged", "name": short tidy name (max 40 chars), "pack": {"size": number|null, "unit": "g"|"ml"|null, "kcal": number|null, "protein": number|null}, "per100": {"unit": "g"|"ml", "kcal": number, "protein": number} or null, "serving": {"label": short label, "kcal": number, "protein": number} or null, "kcal": number for a typical serving, "protein": number, "confidence": "high" if taken from a published source, else "low", "note": one short sentence naming the source}
+${JSON_RULES}`;
+  let r;try{r=await gemini([{text:prompt}],{search:true,signal:ac.signal})}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Online lookup',{name,src:'photo'});return}
+  if(ac.signal.aborted)return;onClose=null;
+  review({...r,type:'packaged',kicker:'Published figures',src:'search'});
+}
+function showMatches(title,kicker,list,otherLabel,otherFn){
+  const opt=r=>{const pk=r.per100&&r.pack.size?r.per100.kcal*r.pack.size/100:null;return pk!=null?fmt(pk)+' kcal/pack':r.serving?fmt(r.serving.kcal)+' kcal/serving':fmt(r.per100.kcal)+' kcal/100'+r.per100.unit};
+  openSheet(`${head(title,kicker)}<div class="list">${list.map((r,i)=>`<button class="row" data-m="${i}"><div class="nm" style="min-width:0">${esc(r.name)}</div><div class="vals small num" style="color:var(--muted)">${opt(r)}</div></button>`).join('')}
+    <button class="row" id="est"><span class="nm" style="color:var(--pro)">${esc(otherLabel)}</span><span aria-hidden="true">›</span></button></div>`,
+  b=>{b.querySelectorAll('[data-m]').forEach(x=>x.onclick=()=>review({...list[+x.dataset.m],src:'search'}));b.querySelector('#est').onclick=otherFn});
 }
 function photoSheet(){
   addErr('');
@@ -587,14 +616,11 @@ function photoSheet(){
 
 /* typed name search */
 async function nameSearch(text,k,p){
-  const ac=new AbortController();busy('Searching…','Food database',()=>ac.abort());
+  const ac=new AbortController();busy('Searching…','Food database',()=>ac.abort());setBusy('Checking Open Food Facts…');
   let list=[];try{list=await offSearch(text,ac.signal)}catch(e){}
   if(ac.signal.aborted)return;onClose=null;
   if(!list.length){estimateText(text,k,p);return}
-  const opt=r=>{const pk=r.per100&&r.pack.size?r.per100.kcal*r.pack.size/100:null;return pk!=null?fmt(pk)+' kcal/pack':r.serving?fmt(r.serving.kcal)+' kcal/serving':fmt(r.per100.kcal)+' kcal/100'+r.per100.unit};
-  openSheet(`${head('Matches for “'+esc(text)+'”','Food database')}<div class="list">${list.map((r,i)=>`<button class="row" data-m="${i}"><div class="nm" style="min-width:0">${esc(r.name)}</div><div class="vals small num" style="color:var(--muted)">${opt(r)}</div></button>`).join('')}
-    <button class="row" id="est"><span class="nm" style="color:var(--pro)">None of these, estimate it</span><span aria-hidden="true">›</span></button></div>`,
-  b=>{b.querySelectorAll('[data-m]').forEach(x=>x.onclick=()=>review({...list[+x.dataset.m],src:'search'}));b.querySelector('#est').onclick=()=>estimateText(text,k,p)});
+  showMatches('Matches for “'+text+'”','Food database',list,'None of these, estimate it',()=>estimateText(text,k,p));
 }
 
 /* ===== add bar ===== */
