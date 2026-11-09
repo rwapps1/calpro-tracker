@@ -332,7 +332,7 @@ function authMsg(e){const c=e&&e.code||'';if(/wrong-password|invalid-credential|
 function signErr(m){$('#signErr').textContent=m;$('#signErr').hidden=!m}
 
 function subscribe(force){
-  const from=[addDays(S.today,-29),S.view].sort()[0];
+  const from=[addDays(S.today,-30),S.view].sort()[0];
   if(!force&&S.entUnsub&&from===S.subFrom)return;
   S.subFrom=from;if(S.entUnsub)S.entUnsub();
   S.entUnsub=S.base.collection('entries').where('day','>=',from).onSnapshot(snap=>{
@@ -500,19 +500,19 @@ chipsEl.addEventListener('pointermove',e=>{if(holdXY&&Math.hypot(e.clientX-holdX
 ['pointerup','pointercancel','pointerleave'].forEach(t=>chipsEl.addEventListener(t,()=>clearTimeout(holdT)));
 chipsEl.addEventListener('contextmenu',e=>{if(e.target.closest('.chip'))e.preventDefault()});
 function renderWeek(){
-  const st=S.settings,n=S.range===30?30:7,days=[];for(let i=n-1;i>=0;i--)days.push(addDays(S.today,-i));
+  const st=S.settings,n=S.range===30?30:7,days=[];for(let i=n;i>=0;i--)days.push(addDays(S.today,-i));/* n full days before today, plus today */
   $('#rangeSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on',+b.dataset.r===n));
   const tots=days.map(totals),maxK=Math.max(st.kcal*1.15,...tots.map(t=>t.k),1);
-  const done=tots.slice(0,n-1).filter(t=>t.k>0||t.p>0),hits=done.filter(t=>t.p>=st.protein).length,under=done.filter(t=>t.k<=st.kcal).length;
-  $('#avg').innerHTML=done.length?`<div><b class="num" style="color:var(--kcal)">${fmt(done.reduce((s,t)=>s+t.k,0)/done.length)}</b> kcal avg</div><div><b class="num" style="color:var(--pro)">${fmtP(done.reduce((s,t)=>s+t.p,0)/done.length)}</b> g protein avg</div><div class="small" style="flex-basis:100%">Across ${done.length} logged ${done.length===1?'day':'days'} before today · under calorie limit on ${under} · protein hit on ${hits}</div>`
+  const done=tots.slice(0,n).filter(t=>t.k>0||t.p>0),hits=done.filter(t=>t.p>=st.protein).length,under=done.filter(t=>t.k<=st.kcal).length;
+  $('#avg').innerHTML=done.length?`<div><b class="num" style="color:var(--kcal)">${fmt(done.reduce((s,t)=>s+t.k,0)/done.length)}</b> kcal avg</div><div><b class="num" style="color:var(--pro)">${fmtP(done.reduce((s,t)=>s+t.p,0)/done.length)}</b> g protein avg</div><div class="small" style="flex-basis:100%">Across ${done.length} logged ${done.length===1?'day':'days'} of the ${n} before today · under calorie limit on ${under} · protein hit on ${hits}</div>`
     :'<div class="note">Averages appear once you have a full day logged.</div>';
-  const bars=$('#bars');bars.classList.toggle('b30',n===30);bars.style.gridTemplateColumns=`repeat(${n},minmax(0,1fr))`;
+  const bars=$('#bars');bars.classList.toggle('b30',n===30);bars.style.gridTemplateColumns=`repeat(${n+1},minmax(0,1fr))`;
   bars.innerHTML=`<div class="tline" style="bottom:${st.kcal/maxK*100}%"></div>`+days.map((d,i)=>{const t=tots[i],c=['bar'];if(t.k>st.kcal)c.push('over');if(d===S.today)c.push('today');if(d===S.view&&d!==S.today)c.push('sel');
     return `<button class="${c.join(' ')}" data-day="${d}" aria-label="${dayLabel(d)}: ${fmt(t.k)} kcal, ${fmtP(t.p)} g protein"><i style="height:${t.k/maxK*100}%"></i></button>`}).join('');
-  const bl=$('#blabels');bl.style.gridTemplateColumns=`repeat(${n},minmax(0,1fr))`;
+  const bl=$('#blabels');bl.style.gridTemplateColumns=`repeat(${n+1},minmax(0,1fr))`;
   bl.innerHTML=n===7?days.map((d,i)=>`<div>${d===S.today?'Today':keyDate(d).toLocaleDateString('en-GB',{weekday:'short'})}<div class="p num ${tots[i].p>=st.protein?'hit':''}">${tots[i].p?Math.round(tots[i].p):'–'}</div></div>`).join('')
-    :`<div style="grid-column:1/11;text-align:left">${dayLabel(days[0],{day:'numeric',month:'short'})}</div><div style="grid-column:21/31;text-align:right">Today</div>`;
-  $('#histHint').textContent=n===7?'Bars show calories against your limit. Numbers underneath are protein (g). Tap a day to open it.':'Bars show calories against your limit. Tap a day to open it.';
+    :`<div style="grid-column:1/11;text-align:left">${dayLabel(days[0],{day:'numeric',month:'short'})}</div><div style="grid-column:22/32;text-align:right">Today</div>`;
+  $('#histHint').textContent=n===7?'Bars show calories against your limit. Numbers underneath are protein (g). Today’s striped bar isn’t in the averages. Tap a day to open it.':'Bars show calories against your limit. Today’s striped bar isn’t in the averages. Tap a day to open it.';
 }
 $('#rangeSeg').onclick=e=>{const b=e.target.closest('[data-r]');if(!b)return;S.range=+b.dataset.r;lsSet('calpro.range',String(S.range));renderWeek()};
 $('#prevDay').onclick=()=>setView(addDays(S.view,-1));
