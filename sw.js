@@ -1,6 +1,6 @@
 // Cal Pro Tracker service worker: caches the app shell so it opens offline.
 // Bump VERSION whenever you upload a new index.html so phones pick it up.
-const VERSION = 'calpro-v10';
+const VERSION = 'calpro-v11';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'favicon.png', 'apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
