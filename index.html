@@ -86,6 +86,13 @@ section h2 small{font-family:var(--body);font-size:13px;color:var(--muted);font-
 .ckrow:last-child{border-bottom:0}
 .ckrow input{width:22px;height:22px;flex:none}
 .ckrow .nm{flex:1;min-width:0;font-weight:500;overflow-wrap:anywhere}
+.page{position:fixed;inset:0;z-index:25;background:var(--bg);overflow-y:auto;overscroll-behavior:contain;
+  padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.pin{max-width:560px;margin:0 auto;display:grid;gap:12px}
+.phead{display:flex;align-items:center;gap:12px}
+.phead h2{font-family:var(--display);font-weight:700;font-size:22px;margin:0}
+.seg.wide{display:flex}
+.seg.wide button{flex:1;min-height:42px;font-size:14px;font-weight:600}
 .week{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px}
 .avg{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;margin-bottom:10px}
 .avg b{font-family:var(--display);font-size:20px;font-weight:700}
@@ -263,6 +270,18 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 <input type="file" id="galFile" accept="image/*" hidden>
 <div id="scrim" hidden></div>
 <section id="sheet" hidden role="dialog" aria-modal="true"><div class="grab"></div><div class="sb" id="sheetBody"></div></section>
+<section id="itemsPage" class="page" hidden aria-label="Saved items">
+  <div class="pin">
+    <header class="phead">
+      <button class="iconbtn" id="ipBack" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+      <h2>Saved items</h2>
+    </header>
+    <div class="seg wide" id="ipTabs"><button data-t="presets">Presets</button><button data-t="past">Past items</button></div>
+    <div class="r1"><input id="ipQ" placeholder="Search saved items" autocomplete="off"><button class="addbtn" id="ipNew" style="white-space:nowrap;padding:0 14px">+ New</button></div>
+    <div class="small" id="ipNote"></div>
+    <div class="list" id="ipList"></div>
+  </div>
+</section>
 <div id="toast" hidden></div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -307,7 +326,7 @@ const qtyOf=e=>+e.qty||1;
 const eachK=e=>e.kcalEach!=null?+e.kcalEach:(+e.kcal||0)/qtyOf(e);
 const eachP=e=>e.proteinEach!=null?+e.proteinEach:(+e.protein||0)/qtyOf(e);
 const dispName=e=>e.name+(qtyOf(e)!==1?' ×'+fmtQ(qtyOf(e)):'');
-const S={view:dayKey(Date.now()),range:+lsGet('calpro.range')||7,subFrom:null,all:null,allLoading:false,base:null,hidden:[],entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
+const S={ov:new Map(),view:dayKey(Date.now()),range:+lsGet('calpro.range')||7,subFrom:null,all:null,allLoading:false,base:null,hidden:[],entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
 const SRC={typed:'typed',estimate:'estimated',photo:'photo',barcode:'barcode',search:'food database',preset:'preset',quick:'quick add'};
 
 /* ===== Firebase ===== */
@@ -321,7 +340,8 @@ auth.onAuthStateChanged(u=>{
   $('#signin').hidden=true;$('#app').hidden=false;$('#addbar').hidden=false;
   S.base=db.collection('calpro').doc(u.uid);
   S.unsub.push(S.base.onSnapshot(s=>{const d=s.data()||{};if(d.settings&&d.settings.kcal)S.settings={kcal:+d.settings.kcal,protein:+d.settings.protein};S.hidden=Array.isArray(d.hiddenChips)?d.hiddenChips:[];render()},()=>{}));
-  S.unsub.push(S.base.collection('presets').onSnapshot(s=>{S.presets=s.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{}));
+  S.unsub.push(S.base.collection('presets').onSnapshot(s=>{S.presets=s.docs.map(d=>({id:d.id,...d.data()}));render();if(pageOpen)renderPage()},()=>{}));
+  S.unsub.push(S.base.collection('items').onSnapshot(s=>{S.ov=new Map(s.docs.map(d=>{const x=d.data();return[x.key,{...x,_id:d.id}]}));render();updateSuggest();if(pageOpen)renderPage()},()=>{}));
   subscribe();
   if(!lsGet('calpro.gemkey'))banner('Add your free Gemini key in Settings to read photos and estimate food. <button id="bKey">Open Settings</button>',()=>$('#bKey').onclick=settingsSheet);
 });
@@ -417,25 +437,45 @@ function copySheet(){
 
 /* ===== search past items as you type ===== */
 function loadAll(){if(S.all||S.allLoading||!S.base)return;S.allLoading=true;
-  S.base.collection('entries').get().then(s=>{S.all=s.docs.map(d=>({id:d.id,...d.data()}));S.allLoading=false;updateSuggest()}).catch(()=>{S.allLoading=false})}
+  S.base.collection('entries').get().then(s=>{S.all=s.docs.map(d=>({id:d.id,...d.data()}));S.allLoading=false;updateSuggest();if(pageOpen)renderPage()}).catch(()=>{S.allLoading=false})}
 const stem=w=>w.length>4?w.replace(/ies$/,'y').replace(/(es|s|ed|ing)$/,''):w;
 const toks=t=>String(t).toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>w.length>1).map(stem);
 function lev(a,b){if(Math.abs(a.length-b.length)>2)return 9;const d=[...Array(b.length+1).keys()];
   for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=t}}return d[b.length]}
 function tokMatch(q,t){if(t.startsWith(q))return 4;if(q.length>=3&&t.includes(q))return 3;if(t.length>=3&&q.startsWith(t))return 3;if(q.length>=4&&lev(q,t)<=(q.length>=7?2:1))return 2;return 0}
+/* ===== saved items: past entries grouped by name, with your edits/deletions applied ===== */
+const itemKey=n=>String(n||'').trim().toLowerCase();
+const ovId=k=>encodeURIComponent(k).slice(0,700);
+function setOv(k,data,merge=true){return S.base.collection('items').doc(ovId(k)).set({key:k,...data,updated:Date.now()},{merge}).catch(()=>toast('Could not save that change.'))}
+function isHiddenEntry(e){const o=S.ov.get(itemKey(e.name));return!!(o&&o.deletedAt&&e.ts<=o.deletedAt)}
+function itemIndex(){
+  const ents=new Map();for(const e of S.all||[])ents.set(e.id,e);for(const e of S.entries)ents.set(e.id,e);
+  const raw=new Map();
+  for(const e of ents.values()){if(isHiddenEntry(e))continue;const k=itemKey(e.name);let it=raw.get(k);
+    if(!it)raw.set(k,it={keys:[k],name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),ts:0,day:null,count:0,src:'quick'});
+    it.count++;if(e.ts>=it.ts){it.ts=e.ts;it.day=e.day;it.kcalEach=eachK(e);it.proteinEach=eachP(e);it.name=e.name}}
+  for(const o of S.ov.values()){let it=raw.get(o.key);
+    if(!it){if(!o.created||o.deletedAt)continue;raw.set(o.key,it={keys:[o.key],name:o.name,ts:0,day:null,count:0,src:'quick',created:true})}
+    if(o.edited||o.created){it.name=o.name||it.name;it.kcalEach=+o.kcalEach||0;it.proteinEach=+o.proteinEach||0;it.edited=true}}
+  const out=new Map();
+  for(const it of raw.values()){const k=itemKey(it.name),m=out.get(k);if(!m){out.set(k,it);continue}
+    m.keys.push(...it.keys);m.count+=it.count;
+    if(it.edited&&!m.edited){m.kcalEach=it.kcalEach;m.proteinEach=it.proteinEach;m.name=it.name;m.edited=true}
+    else if(!m.edited&&it.ts>m.ts){m.kcalEach=it.kcalEach;m.proteinEach=it.proteinEach}
+    if(it.ts>m.ts){m.ts=it.ts;m.day=it.day}}
+  return out;
+}
+function pastItems(){const pn=new Set(S.presets.map(p=>itemKey(p.name)));return[...itemIndex().entries()].filter(([k])=>!pn.has(k)).map(([,v])=>v)}
+function matchScore(qt,name){const nt=toks(name);let sc=0,hit=0;
+  for(const q of qt){let best=0;for(const t of nt)best=Math.max(best,tokMatch(q,t));if(best)hit++;sc+=best}
+  return hit?{all:hit===qt.length,sc}:null}
 function searchItems(text){
   const qt=toks(text);if(!qt.length)return[];
-  const items=new Map();
-  const ents=new Map();for(const e of S.all||[])ents.set(e.id,e);for(const e of S.entries)ents.set(e.id,e);
-  for(const e of ents.values()){const k=e.name.toLowerCase(),it=items.get(k);
-    if(!it)items.set(k,{name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),ts:e.ts,day:e.day,count:1,src:'quick'});
-    else{it.count++;if(e.ts>it.ts){it.ts=e.ts;it.day=e.day;it.kcalEach=eachK(e);it.proteinEach=eachP(e);it.name=e.name}}}
-  for(const p of S.presets){const k=p.name.toLowerCase(),it=items.get(k)||{ts:0,count:0};
+  const items=itemIndex();
+  for(const p of S.presets){const k=itemKey(p.name),it=items.get(k)||{ts:0,count:0};
     items.set(k,{...it,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0,presetId:p.id,src:'preset'})}
   const out=[];
-  for(const it of items.values()){const nt=toks(it.name);let sc=0,hit=0;
-    for(const q of qt){let best=0;for(const t of nt)best=Math.max(best,tokMatch(q,t));if(best)hit++;sc+=best}
-    if(hit)out.push({it,all:hit===qt.length,sc})}
+  for(const it of items.values()){const m=matchScore(qt,it.name);if(m)out.push({it,...m})}
   out.sort((a,b)=>(b.all-a.all)||(b.sc-a.sc)||(!!b.it.presetId-!!a.it.presetId)||(b.it.count-a.it.count)||(b.it.ts-a.it.ts));
   return out.slice(0,6).map(x=>x.it);
 }
@@ -478,7 +518,8 @@ function renderChips(){
   const hid=new Set(S.hidden);
   const used=[...S.presets].filter(p=>!hid.has(p.name.toLowerCase())).sort((a,b)=>(b.lastUsed||0)-(a.lastUsed||0)||(b.uses||0)-(a.uses||0)).slice(0,5).map(fromPreset);
   const names=new Set([...used.map(u=>u.name.toLowerCase()),...hid]),recent=[];
-  for(const e of [...S.entries].sort((a,b)=>b.ts-a.ts)){const n=e.name.toLowerCase();if(!names.has(n)){names.add(n);recent.push({name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),src:'quick'})}if(recent.length>=4)break}
+  for(const e of [...S.entries].sort((a,b)=>b.ts-a.ts)){if(isHiddenEntry(e))continue;const o=S.ov.get(itemKey(e.name)),ed=o&&o.edited,nm=ed?o.name||e.name:e.name,n=itemKey(nm);
+    if(!names.has(n)){names.add(n);recent.push({name:nm,kcalEach:ed?+o.kcalEach:eachK(e),proteinEach:ed?+o.proteinEach:eachP(e),src:'quick'})}if(recent.length>=4)break}
   S.chips=[...used,...recent];$('#quickSec').hidden=!S.chips.length;
   $('#chips').innerHTML=S.chips.map((c,i)=>`<button class="chip" data-i="${i}">+ ${esc(c.name)}<em class="num">${fmt(c.kcalEach)}</em></button>`).join('');
 }
@@ -537,11 +578,79 @@ function openSheet(html,mount,close){
   mount&&mount($('#sheetBody'));
 }
 function closeSheet(fromPop){
-  if(!sheetOpen)return;sheetOpen=false;document.documentElement.classList.remove('locked');$('#sheet').hidden=true;$('#scrim').hidden=true;
+  if(!sheetOpen)return;sheetOpen=false;if(!pageOpen)document.documentElement.classList.remove('locked');$('#sheet').hidden=true;$('#scrim').hidden=true;
   if(onClose){const f=onClose;onClose=null;f()}
   if(!fromPop&&history.state&&history.state.sheet)history.back();
 }
-window.addEventListener('popstate',()=>{if(sheetOpen)closeSheet(true)});
+window.addEventListener('popstate',e=>{if(sheetOpen){closeSheet(true);return}if(pageOpen&&!(e.state&&e.state.page))closePage(true)});
+/* ===== Saved items page ===== */
+let pageOpen=false;S.tab='presets';
+function openItemsPage(){
+  if(sheetOpen){sheetOpen=false;onClose=null;$('#sheet').hidden=true;$('#scrim').hidden=true;history.replaceState({page:1},'')}
+  else history.pushState({page:1},'');
+  pageOpen=true;document.documentElement.classList.add('locked');$('#itemsPage').hidden=false;$('#itemsPage').scrollTop=0;$('#ipQ').value='';
+  loadAll();renderPage();
+}
+function closePage(fromPop){if(!pageOpen)return;pageOpen=false;$('#itemsPage').hidden=true;document.documentElement.classList.remove('locked');
+  if(!fromPop&&history.state&&history.state.page)history.back()}
+function renderPage(){
+  const qt=toks($('#ipQ').value.trim()),past=pastItems();
+  $('#ipTabs').querySelectorAll('button').forEach(b=>{const t=b.dataset.t;b.classList.toggle('on',t===S.tab);b.textContent=(t==='presets'?'Presets':'Past items')+' · '+(t==='presets'?S.presets.length:past.length)});
+  let list=S.tab==='presets'?S.presets.map(p=>({preset:p,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0})):past;
+  if(qt.length)list=list.map(it=>({it,m:matchScore(qt,it.name)})).filter(x=>x.m).sort((a,b)=>(b.m.all-a.m.all)||(b.m.sc-a.m.sc)).map(x=>x.it);
+  else list.sort(S.tab==='presets'?(a,b)=>((b.preset.uses||0)-(a.preset.uses||0))||a.name.localeCompare(b.name):(a,b)=>(b.count-a.count)||(b.ts-a.ts));
+  S.pageList=list;
+  const when=d=>d===S.today?'today':d===addDays(S.today,-1)?'yesterday':dayLabel(d,{day:'numeric',month:'short'});
+  const meta=it=>S.tab==='presets'?(it.preset.uses?'used '+it.preset.uses+'×':'not used yet'):[it.count?`logged ${it.count} ${it.count===1?'time':'times'}`:'added by you',it.day?'last '+when(it.day):'',it.edited?'edited':''].filter(Boolean).join(' · ');
+  $('#ipNote').textContent=S.tab==='presets'?'Presets you’ve saved. Tap one to edit or delete it.':(S.allLoading&&!S.all?'Loading your history…':'Everything you’ve logged that isn’t a preset. Edits apply to future logs only.');
+  $('#ipNew').textContent=S.tab==='presets'?'+ New preset':'+ New item';
+  $('#ipList').innerHTML=list.length?list.map((it,i)=>`<button class="row" data-pi="${i}"><div style="min-width:0"><div class="nm">${esc(it.name)}</div><div class="meta">${esc(meta(it))}</div></div><div class="vals num"><b>${fmtP(it.kcalEach)} kcal</b><span>${fmtP(it.proteinEach)} g</span></div></button>`).join('')
+    :`<div class="empty">${qt.length?'Nothing matches that search.':S.tab==='presets'?'No presets yet. Tap + New preset to add one.':'Nothing logged yet.'}</div>`;
+}
+$('#ipBack').onclick=()=>closePage();
+$('#ipTabs').onclick=e=>{const b=e.target.closest('[data-t]');if(!b)return;S.tab=b.dataset.t;renderPage();$('#itemsPage').scrollTop=0};
+$('#ipQ').addEventListener('input',renderPage);
+$('#ipList').onclick=e=>{const r=e.target.closest('[data-pi]');if(!r)return;const it=S.pageList[+r.dataset.pi];if(!it)return;if(it.preset)presetItemSheet(it.preset);else pastItemSheet(it)};
+$('#ipNew').onclick=()=>newItemSheet();
+const figFields=(n,k,p,ph)=>`<label class="f">Name<input id="iN" value="${esc(n)}" placeholder="${ph||'Morning protein shake'}"></label>
+    <div class="fields"><label class="f">Calories per item<input id="iK" inputmode="decimal" value="${k}"></label><label class="f">Protein per item (g)<input id="iP" inputmode="decimal" value="${p}"></label></div>
+    <div class="err" id="iErr" hidden></div>`;
+function readFig(b){const n=b.querySelector('#iN').value.trim(),k=num(b.querySelector('#iK').value),p=num(b.querySelector('#iP').value);
+  if(!n||k==null||p==null){const e=b.querySelector('#iErr');e.textContent='Add a name, calories and protein.';e.hidden=false;return null}return{name:n,kcal:k,protein:p}}
+function armed(btn,fn){btn.onclick=()=>{if(!btn.classList.contains('armed')){btn.classList.add('armed');btn.textContent='Tap to confirm';return}fn()}}
+function pastItemSheet(it){
+  openSheet(`${head('Edit past item',it.count?`Logged ${it.count} ${it.count===1?'time':'times'}`:'Added by you')}
+    ${figFields(it.name,fmtP(it.kcalEach),fmtP(it.proteinEach))}
+    <div class="small">Used for future logs, search and Quick add. Past days stay as logged.</div>
+    <div class="actions"><button class="secondary" id="iPre">Make preset</button><button class="danger" id="iDel">Delete</button></div>
+    <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="iSave">Save</button></div>`,
+  b=>{const save=v=>it.keys.forEach(k=>setOv(k,{name:v.name,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),edited:true,deletedAt:0}));
+    b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;save(v);toast('Saved');closeSheet()};
+    b.querySelector('#iPre').onclick=()=>{const v=readFig(b);if(!v)return;save(v);savePreset(v);toast('Moved to Presets');closeSheet()};
+    armed(b.querySelector('#iDel'),()=>{const prev=it.keys.map(k=>[k,S.ov.get(k)]),now=Date.now();
+      it.keys.forEach(k=>setOv(k,{deletedAt:now,edited:false,created:false}));closeSheet();
+      toast('Deleted '+it.name,()=>prev.forEach(([k,o])=>{if(o){const{_id,...d}=o;setOv(k,d,false)}else S.base.collection('items').doc(ovId(k)).delete().catch(()=>{})}))})});
+}
+function presetItemSheet(p){
+  openSheet(`${head('Edit preset',p.uses?'Used '+p.uses+'×':'Not used yet')}
+    ${figFields(p.name,fmtP(p.kcal),fmtP(p.protein))}
+    <div class="small">Changes apply next time you add it. Past days stay as logged.</div>
+    <div class="actions"><button class="danger" id="iDel">Delete</button><button class="primary" id="iSave">Save</button></div>`,
+  b=>{b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;savePreset(v,p.id);toast('Preset saved');closeSheet()};
+    armed(b.querySelector('#iDel'),()=>{const{id,...data}=p,k=itemKey(p.name),prev=S.ov.get(k);
+      S.base.collection('presets').doc(id).delete().catch(()=>toast('Could not delete.'));setOv(k,{deletedAt:Date.now(),edited:false,created:false});closeSheet();
+      toast('Deleted '+p.name,()=>{S.base.collection('presets').doc(id).set(data).catch(()=>{});if(prev){const{_id,...d}=prev;setOv(k,d,false)}else S.base.collection('items').doc(ovId(k)).delete().catch(()=>{})})})});
+}
+function newItemSheet(){
+  const pre=S.tab==='presets';
+  openSheet(`${head(pre?'New preset':'New item')}
+    ${figFields('','','',pre?'Morning protein shake':'Homemade chilli')}
+    <div class="small">${pre?'Shows in Presets, search and Quick add.':'Shows in search when you type its name.'} Nothing is logged until you add it.</div>
+    <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="iSave">${pre?'Save preset':'Save item'}</button></div>`,
+  b=>b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;
+    if(pre)savePreset(v);else setOv(itemKey(v.name),{name:v.name,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),created:true,edited:true,deletedAt:0});
+    toast(pre?'Preset saved':'Item saved');closeSheet()});
+}
 $('#scrim').onclick=()=>closeSheet();
 const head=(t,k)=>`<div class="sh"><div style="min-width:0">${k?`<div class="kicker">${k}</div>`:''}<h3>${t}</h3></div><button class="x" data-close aria-label="Close">${X}</button></div>`;
 function setBusy(t){const el=document.getElementById('busyMsg');if(el)el.textContent=t}
@@ -922,6 +1031,7 @@ function settingsSheet(){
     <div class="small">The key is stored on this device only. Get one free at aistudio.google.com.</div>
     <button class="secondary" id="sTest" style="height:44px;border-radius:12px;font-weight:600">Test connections</button>
     <div class="small" id="sTestOut" style="white-space:pre-wrap"></div>
+    <button class="secondary" id="sItems" style="height:44px;border-radius:12px;font-weight:600">Saved items</button>
     <button class="secondary" id="sRules" style="height:44px;border-radius:12px;font-weight:600">How data is found</button>
     ${S.hidden.length?`<button class="secondary" id="sUnhide" style="height:44px;border-radius:12px;font-weight:600">Restore hidden Quick add items (${S.hidden.length})</button>`:''}
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="sSave">Save</button></div>
@@ -932,7 +1042,7 @@ function settingsSheet(){
       if(k&&p){S.settings={kcal:Math.round(k),protein:Math.round(p)};S.base.set({settings:S.settings},{merge:true}).catch(()=>toast('Could not save targets.'))}
       if(lsGet('calpro.gemkey'))banner('');render();toast('Settings saved');closeSheet()};
     q('#sOut').onclick=()=>{closeSheet();auth.signOut()};
-    q('#sRules').onclick=rulesSheet;
+    q('#sRules').onclick=rulesSheet;q('#sItems').onclick=openItemsPage;
     if(q('#sUnhide'))q('#sUnhide').onclick=()=>{S.hidden=[];render();S.base.set({hiddenChips:[]},{merge:true}).catch(()=>toast('Could not save that change.'));toast('Quick add items restored');q('#sUnhide').remove()};
     q('#sTest').onclick=async()=>{const out=q('#sTestOut'),log=m=>out.textContent+=m+'\n';out.textContent='';
       lsSet('calpro.gemkey',q('#sKey').value.trim());lsSet('calpro.model',q('#sModel').value.trim()==='gemini-flash-latest'?'':q('#sModel').value.trim());
