@@ -154,6 +154,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 .primary{background:var(--btn);color:var(--on-btn)}
 .secondary{border:1px solid var(--line);background:var(--surface)}
 .danger{border:1px solid var(--over);color:var(--over)}
+.simbtn.armed{background:var(--over);color:var(--surface);border-color:var(--over)}
 .danger.armed{background:var(--over);color:var(--surface)}
 .check{display:flex;gap:10px;align-items:center;font-size:14px;min-height:40px}
 .check input{width:22px;height:22px}
@@ -163,6 +164,7 @@ label.f{display:grid;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
 .prow{display:flex;align-items:center;border-bottom:1px solid var(--line)}
 .prow:last-child{border-bottom:0}
 .prow .row{border:0;flex:1}
+.simbtn{flex:none;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:8px;padding:0 9px;min-height:36px;margin-right:10px;white-space:nowrap;background:var(--surface-2)}
 .bigopt{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:14px;padding:14px;min-height:60px;font-weight:600;cursor:pointer;background:var(--surface-2)}
 .bigopt svg{width:24px;height:24px;flex:none}
 /* scanner */
@@ -601,26 +603,64 @@ function openItemsPage(){
 }
 function closePage(fromPop){if(!pageOpen)return;pageOpen=false;$('#itemsPage').hidden=true;document.documentElement.classList.remove('locked');
   if(!fromPop&&history.state&&history.state.page)history.back()}
+/* similar names: shared words (mash ~ mashed, potato ~ potatoes) or a near-identical spelling */
+const STOP=new Set(['with','and','the','for','fresh','large','small','medium','of','in','on']);
+const simToks=n=>toks(n).filter(t=>t.length>=3&&!STOP.has(t));
+function similarity(A,B,a,b){
+  if(itemKey(a)===itemKey(b))return 0;
+  const flat=x=>itemKey(x).replace(/[^a-z0-9]/g,''),fa=flat(a),fb=flat(b);
+  if(Math.min(fa.length,fb.length)>=5&&lev(fa,fb)<=2)return 1;
+  if(!A.length||!B.length)return 0;
+  let m=0;for(const x of A){let best=0;for(const y of B)best=Math.max(best,tokMatch(x,y),tokMatch(y,x));if(best>=2)m++}
+  const sc=m/Math.max(A.length,B.length);return m&&sc>=.5?sc:0;
+}
+function allSaved(){return[...S.presets.map(p=>({preset:p,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0})),...pastItems()]}
+function similarTo(it,pool){const A=simToks(it.name);
+  return pool.filter(o=>o!==it).map(o=>({o,sc:similarity(A,simToks(o.name),it.name,o.name)})).filter(x=>x.sc).sort((a,b)=>b.sc-a.sc).map(x=>x.o)}
+const whenLbl=d=>d===S.today?'today':d===addDays(S.today,-1)?'yesterday':dayLabel(d,{day:'numeric',month:'short'});
+const itemMeta=it=>it.preset?(it.preset.uses?'used '+it.preset.uses+'×':'not used yet'):[it.count?`logged ${it.count} ${it.count===1?'time':'times'}`:'added by you',it.day?'last '+whenLbl(it.day):''].filter(Boolean).join(' · ');
+const itemSrc=it=>it.preset?(it.preset.origin==='edited'?'Edited by you':it.preset.origin&&it.preset.origin!=='manual'?'Saved from '+originLabel(it.preset.origin):'Created by you')
+  :it.created&&!it.count?'Added by you':it.edited?'Edited by you'+(it.origin&&it.origin!=='manual'?' · originally '+itemOriginLabel(it.origin):''):itemOriginLabel(it.origin);
+const itemRow=(it,attr)=>`<button class="row" ${attr}><div style="min-width:0"><div class="nm">${esc(it.name)}${it.preset&&S.tab!=='presets'?'<span class="badge">preset</span>':''}</div><div class="meta">${esc(itemMeta(it))}</div><div class="meta" style="color:var(--ink)">${esc(itemSrc(it))}</div></div><div class="vals num"><b>${fmtP(it.kcalEach)} kcal</b><span>${fmtP(it.proteinEach)} g</span></div></button>`;
 function renderPage(){
-  const qt=toks($('#ipQ').value.trim()),past=pastItems();
+  const qt=toks($('#ipQ').value.trim()),pool=allSaved(),past=pool.filter(x=>!x.preset);
   $('#ipTabs').querySelectorAll('button').forEach(b=>{const t=b.dataset.t;b.classList.toggle('on',t===S.tab);b.textContent=(t==='presets'?'Presets':'Past items')+' · '+(t==='presets'?S.presets.length:past.length)});
-  let list=S.tab==='presets'?S.presets.map(p=>({preset:p,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0})):past;
+  let list=S.tab==='presets'?pool.filter(x=>x.preset):past;
   if(qt.length)list=list.map(it=>({it,m:matchScore(qt,it.name)})).filter(x=>x.m).sort((a,b)=>(b.m.all-a.m.all)||(b.m.sc-a.m.sc)).map(x=>x.it);
   else list.sort(S.tab==='presets'?(a,b)=>((b.preset.uses||0)-(a.preset.uses||0))||a.name.localeCompare(b.name):(a,b)=>(b.count-a.count)||(b.ts-a.ts));
-  S.pageList=list;
-  const when=d=>d===S.today?'today':d===addDays(S.today,-1)?'yesterday':dayLabel(d,{day:'numeric',month:'short'});
-  const meta=it=>S.tab==='presets'?(it.preset.uses?'used '+it.preset.uses+'×':'not used yet'):[it.count?`logged ${it.count} ${it.count===1?'time':'times'}`:'added by you',it.day?'last '+when(it.day):''].filter(Boolean).join(' · ');
-  const srcOf=it=>S.tab==='presets'?(it.preset.origin==='edited'?'Edited by you':it.preset.origin&&it.preset.origin!=='manual'?'Saved from '+originLabel(it.preset.origin):'Created by you')
-    :it.created&&!it.count?'Added by you':it.edited?'Edited by you'+(it.origin&&it.origin!=='manual'?' · originally '+itemOriginLabel(it.origin):''):itemOriginLabel(it.origin);
+  S.pageList=list;S.pagePool=pool;S.pageSim=list.map(it=>similarTo(it,pool));
   $('#ipNote').textContent=S.tab==='presets'?'Presets you’ve saved. Tap one to edit or delete it.':(S.allLoading&&!S.all?'Loading your history…':'Everything you’ve logged that isn’t a preset. Edits apply to future logs only.');
   $('#ipNew').textContent=S.tab==='presets'?'+ New preset':'+ New item';
-  $('#ipList').innerHTML=list.length?list.map((it,i)=>`<button class="row" data-pi="${i}"><div style="min-width:0"><div class="nm">${esc(it.name)}</div><div class="meta">${esc(meta(it))}</div><div class="meta" style="color:var(--ink)">${esc(srcOf(it))}</div></div><div class="vals num"><b>${fmtP(it.kcalEach)} kcal</b><span>${fmtP(it.proteinEach)} g</span></div></button>`).join('')
+  $('#ipList').innerHTML=list.length?list.map((it,i)=>{const n=S.pageSim[i].length;return `<div class="prow">${itemRow(it,`data-pi="${i}"`)}${n?`<button class="simbtn" data-sim="${i}" aria-label="${n} similar to ${esc(it.name)}">${n} similar</button>`:''}</div>`}).join('')
     :`<div class="empty">${qt.length?'Nothing matches that search.':S.tab==='presets'?'No presets yet. Tap + New preset to add one.':'Nothing logged yet.'}</div>`;
+}
+/* merge: the lookalike stops appearing in search and Quick add; past days are untouched */
+function mergeInto(src,target){
+  const now=Date.now(),keys=src.preset?[itemKey(src.preset.name)]:src.keys,prev=keys.map(k=>[k,S.ov.get(k)]);
+  let presetBack=null;
+  if(src.preset){const{id,...data}=src.preset;presetBack=[id,data];S.base.collection('presets').doc(id).delete().catch(()=>toast('Could not merge.'))}
+  keys.forEach(k=>setOv(k,{deletedAt:now,edited:false,created:false,mergedInto:target.name}));
+  toast(`Merged ${src.name} into ${target.name}`,()=>{if(presetBack)S.base.collection('presets').doc(presetBack[0]).set(presetBack[1]).catch(()=>{});
+    prev.forEach(([k,o])=>{if(o){const{_id,...d}=o;setOv(k,d,false)}else S.base.collection('items').doc(ovId(k)).delete().catch(()=>{})})});
+}
+function similarSheet(it){
+  const sims=similarTo(it,allSaved());
+  openSheet(`${head(esc(it.name),'Similar to')}
+    <div class="note num">${fmtP(it.kcalEach)} kcal · ${fmtP(it.proteinEach)} g · ${it.preset?'Preset':'Past item'}</div>
+    <div class="list">${sims.length?sims.map((o,i)=>`<div class="prow">${itemRow(o,`data-so="${i}"`)}<button class="simbtn" data-mg="${i}">Merge</button></div>`).join(''):'<div class="empty">No similar items any more.</div>'}</div>
+    <div class="small">Tap an item to edit or delete it. Merge removes it from search and Quick add, so “${esc(it.name)}” is the one you’ll see. Past days stay as logged.</div>
+    <div class="actions"><button class="secondary" data-close>Close</button></div>`,
+  b=>{b.querySelector('.list').onclick=e=>{
+      const m=e.target.closest('[data-mg]');
+      if(m){const o=sims[+m.dataset.mg];if(!m.classList.contains('armed')){b.querySelectorAll('[data-mg].armed').forEach(x=>{x.classList.remove('armed');x.textContent='Merge'});m.classList.add('armed');m.textContent='Confirm';return}
+        mergeInto(o,it);closeSheet();return}
+      const r=e.target.closest('[data-so]');if(r){const o=sims[+r.dataset.so];if(o.preset)presetItemSheet(o.preset);else pastItemSheet(o)}}});
 }
 $('#ipBack').onclick=()=>closePage();
 $('#ipTabs').onclick=e=>{const b=e.target.closest('[data-t]');if(!b)return;S.tab=b.dataset.t;renderPage();$('#itemsPage').scrollTop=0};
 $('#ipQ').addEventListener('input',renderPage);
-$('#ipList').onclick=e=>{const r=e.target.closest('[data-pi]');if(!r)return;const it=S.pageList[+r.dataset.pi];if(!it)return;if(it.preset)presetItemSheet(it.preset);else pastItemSheet(it)};
+$('#ipList').onclick=e=>{const sm=e.target.closest('[data-sim]');if(sm){const it=S.pageList[+sm.dataset.sim];if(it)similarSheet(it);return}
+  const r=e.target.closest('[data-pi]');if(!r)return;const it=S.pageList[+r.dataset.pi];if(!it)return;if(it.preset)presetItemSheet(it.preset);else pastItemSheet(it)};
 $('#ipNew').onclick=()=>newItemSheet();
 const figFields=(n,k,p,ph)=>`<label class="f">Name<input id="iN" value="${esc(n)}" placeholder="${ph||'Morning protein shake'}"></label>
     <div class="fields"><label class="f">Calories per item<input id="iK" inputmode="decimal" value="${k}"></label><label class="f">Protein per item (g)<input id="iP" inputmode="decimal" value="${p}"></label></div>
