@@ -328,6 +328,12 @@ const eachP=e=>e.proteinEach!=null?+e.proteinEach:(+e.protein||0)/qtyOf(e);
 const dispName=e=>e.name+(qtyOf(e)!==1?' ×'+fmtQ(qtyOf(e)):'');
 const S={ov:new Map(),view:dayKey(Date.now()),range:+lsGet('calpro.range')||7,subFrom:null,all:null,allLoading:false,base:null,hidden:[],entries:[],presets:[],settings:{kcal:2400,protein:180},today:dayKey(Date.now()),sel:null,ready:false,unsub:[],entUnsub:null};
 const SRC={typed:'typed',estimate:'estimated',photo:'photo',barcode:'barcode',search:'food database',preset:'preset',quick:'quick add'};
+/* where an item's figures came from; entries keep it in "origin" so re-adds remember the first source */
+const ORIG={typed:'Typed by you',manual:'Added by you',edited:'Edited by you',barcode:'Barcode · Open Food Facts',search:'Food database',online:'Gemini · published figures',
+  label:'Gemini · read from a label',plate:'Gemini · estimated from a plate',pack:'Gemini · typical values',photo:'Gemini · from a photo',estimate:'Gemini estimate',quick:'Quick add',preset:'Preset'};
+const entryOrigin=e=>e.origin||e.src||'typed';
+const originLabel=o=>ORIG[o]||'Source not recorded';
+const itemOriginLabel=o=>!o||o==='quick'||o==='preset'?'Source not recorded':originLabel(o);
 
 /* ===== Firebase ===== */
 firebase.initializeApp(FIREBASE_CONFIG);
@@ -363,7 +369,7 @@ function subscribe(force){
 function entryDoc(e,day){
   const q=+e.qty||1,ke=e.kcalEach!=null?+e.kcalEach:(+e.kcal||0)/q,pe=e.proteinEach!=null?+e.proteinEach:(+e.protein||0)/q;
   let ts=Date.now();if(day!==S.today){const n=new Date(),d=keyDate(day);d.setHours(n.getHours(),n.getMinutes(),n.getSeconds());ts=d.getTime()}
-  return{day,ts,name:(e.name||'Entry').slice(0,80),qty:q,kcalEach:r1(ke),proteinEach:r1(pe),kcal:Math.round(ke*q),protein:r1(pe*q),src:e.src||'typed'};
+  return{day,ts,name:(e.name||'Entry').slice(0,80),qty:q,kcalEach:r1(ke),proteinEach:r1(pe),kcal:Math.round(ke*q),protein:r1(pe*q),src:e.src||'typed',origin:e.origin||e.src||'typed'};
 }
 function addEntry(e,msg){
   if(!S.base)return;
@@ -373,10 +379,10 @@ function addEntry(e,msg){
   toast(msg||('Added '+dispName(d)+(day===S.today?'':' to '+dayLabel(day))),()=>{ref.delete();if(S.all)S.all=S.all.filter(x=>x.id!==ref.id)});
 }
 function savePreset(p,id){
-  const d={name:(p.name||'Preset').slice(0,60),kcal:Math.round(+p.kcal||0),protein:Math.round((+p.protein||0)*10)/10};
+  const d={name:(p.name||'Preset').slice(0,60),kcal:Math.round(+p.kcal||0),protein:Math.round((+p.protein||0)*10)/10};if(p.origin)d.origin=p.origin;
   const c=S.base.collection('presets');(id?c.doc(id).update(d):c.add({...d,uses:0,lastUsed:0})).catch(()=>toast('Could not save preset.'));
 }
-const fromPreset=p=>({name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0,presetId:p.id,src:'preset'});
+const fromPreset=p=>({name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0,presetId:p.id,src:'preset',origin:p.origin||'manual'});
 
 /* day chips used by the amount picker and Move */
 function dayChoices(day){const t=S.today,y=addDays(t,-1),l=[[t,'Today'],[y,'Yesterday']];if(day!==t&&day!==y)l.push([day,dayLabel(day)]);return l}
@@ -405,7 +411,7 @@ function qtySheet(it,o={}){
   b=>{const btn=b.querySelector('#qAdd');
     const label=()=>{btn.textContent=`Add ${fmt(it.kcalEach*qty)} kcal · ${fmtP(it.proteinEach*qty)} g`};
     mountQty(b,'qq',()=>qty,v=>{qty=v;label()});mountDayPicker(b,()=>day,v=>{day=v});label();
-    btn.onclick=()=>{addEntry({name:it.name,kcalEach:it.kcalEach,proteinEach:it.proteinEach,qty,day,src:it.src||'quick'});
+    btn.onclick=()=>{addEntry({name:it.name,kcalEach:it.kcalEach,proteinEach:it.proteinEach,qty,day,src:it.src||'quick',origin:it.origin});
       if(it.presetId){const p=S.presets.find(x=>x.id===it.presetId);if(p)S.base.collection('presets').doc(p.id).update({uses:(p.uses||0)+1,lastUsed:Date.now()}).catch(()=>{})}
       closeSheet()}});
 }
@@ -430,7 +436,7 @@ function copySheet(){
     const label=()=>{const n=picked().length;go.textContent=n?`Add ${n} ${n===1?'item':'items'} to today`:'Tick items to copy'};
     b.querySelectorAll('[data-c]').forEach(x=>x.onchange=label);
     go.onclick=()=>{const sel=picked();if(!sel.length)return;const batch=db.batch(),refs=[];
-      for(const e of sel){const ref=S.base.collection('entries').doc();refs.push(ref);const d=entryDoc({name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),qty:qtyOf(e),src:e.src},S.today);batch.set(ref,d);if(S.all)S.all.push({id:ref.id,...d})}
+      for(const e of sel){const ref=S.base.collection('entries').doc();refs.push(ref);const d=entryDoc({name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),qty:qtyOf(e),src:e.src,origin:entryOrigin(e)},S.today);batch.set(ref,d);if(S.all)S.all.push({id:ref.id,...d})}
       batch.commit().catch(()=>toast('Could not copy those items.'));closeSheet();
       toast(`Added ${sel.length} ${sel.length===1?'item':'items'} to today`,()=>{const u=db.batch();refs.forEach(r=>u.delete(r));u.commit().catch(()=>{})})}});
 }
@@ -453,13 +459,14 @@ function itemIndex(){
   const raw=new Map();
   for(const e of ents.values()){if(isHiddenEntry(e))continue;const k=itemKey(e.name);let it=raw.get(k);
     if(!it)raw.set(k,it={keys:[k],name:e.name,kcalEach:eachK(e),proteinEach:eachP(e),ts:0,day:null,count:0,src:'quick'});
-    it.count++;if(e.ts>=it.ts){it.ts=e.ts;it.day=e.day;it.kcalEach=eachK(e);it.proteinEach=eachP(e);it.name=e.name}}
+    it.count++;if(e.ts>=it.ts){it.ts=e.ts;it.day=e.day;it.kcalEach=eachK(e);it.proteinEach=eachP(e);it.name=e.name}
+    const eo=entryOrigin(e);if(eo!=='quick'&&eo!=='preset'&&e.ts>=(it.oTs||0)){it.origin=eo;it.oTs=e.ts}}
   for(const o of S.ov.values()){let it=raw.get(o.key);
-    if(!it){if(!o.created||o.deletedAt)continue;raw.set(o.key,it={keys:[o.key],name:o.name,ts:0,day:null,count:0,src:'quick',created:true})}
+    if(!it){if(!o.created||o.deletedAt)continue;raw.set(o.key,it={keys:[o.key],name:o.name,ts:0,day:null,count:0,src:'quick',created:true,origin:'manual'})}
     if(o.edited||o.created){it.name=o.name||it.name;it.kcalEach=+o.kcalEach||0;it.proteinEach=+o.proteinEach||0;it.edited=true}}
   const out=new Map();
   for(const it of raw.values()){const k=itemKey(it.name),m=out.get(k);if(!m){out.set(k,it);continue}
-    m.keys.push(...it.keys);m.count+=it.count;
+    m.keys.push(...it.keys);m.count+=it.count;if((it.oTs||0)>(m.oTs||0)&&it.origin){m.origin=it.origin;m.oTs=it.oTs}
     if(it.edited&&!m.edited){m.kcalEach=it.kcalEach;m.proteinEach=it.proteinEach;m.name=it.name;m.edited=true}
     else if(!m.edited&&it.ts>m.ts){m.kcalEach=it.kcalEach;m.proteinEach=it.proteinEach}
     if(it.ts>m.ts){m.ts=it.ts;m.day=it.day}}
@@ -473,7 +480,7 @@ function searchItems(text){
   const qt=toks(text);if(!qt.length)return[];
   const items=itemIndex();
   for(const p of S.presets){const k=itemKey(p.name),it=items.get(k)||{ts:0,count:0};
-    items.set(k,{...it,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0,presetId:p.id,src:'preset'})}
+    items.set(k,{...it,name:p.name,kcalEach:+p.kcal||0,proteinEach:+p.protein||0,presetId:p.id,src:'preset',origin:p.origin||'manual'})}
   const out=[];
   for(const it of items.values()){const m=matchScore(qt,it.name);if(m)out.push({it,...m})}
   out.sort((a,b)=>(b.all-a.all)||(b.sc-a.sc)||(!!b.it.presetId-!!a.it.presetId)||(b.it.count-a.it.count)||(b.it.ts-a.it.ts));
@@ -492,7 +499,7 @@ function updateSuggest(){
 /* ===== rendering ===== */
 function totals(day){let k=0,p=0;for(const e of S.entries)if(e.day===day){k+=+e.kcal||0;p+=+e.protein||0}return{k,p}}
 function dayEntries(day){return S.entries.filter(e=>e.day===day).sort((a,b)=>b.ts-a.ts)}
-function rowHTML(e){return `<button class="row" data-id="${esc(e.id)}"><div style="min-width:0"><div class="nm">${esc(dispName(e))}</div><div class="meta">${timeLabel(e.ts)} · ${SRC[e.src]||esc(e.src)}</div></div><div class="vals num"><b>${fmt(e.kcal)} kcal</b><span>${fmtP(e.protein)} g</span></div></button>`}
+function rowHTML(e){return `<button class="row" data-id="${esc(e.id)}"><div style="min-width:0"><div class="nm">${esc(dispName(e))}</div><div class="meta">${timeLabel(e.ts)} · ${esc(e.src==='preset'?'Preset':originLabel(entryOrigin(e)))}</div></div><div class="vals num"><b>${fmt(e.kcal)} kcal</b><span>${fmtP(e.protein)} g</span></div></button>`}
 function render(){
   const v=S.view,isT=v===S.today,st=S.settings,{k,p}=totals(v);
   $('#dayTitle').textContent=dayLabel(v,{weekday:'long',day:'numeric',month:'short'});
@@ -518,8 +525,9 @@ function renderChips(){
   const hid=new Set(S.hidden);
   const used=[...S.presets].filter(p=>!hid.has(p.name.toLowerCase())).sort((a,b)=>(b.lastUsed||0)-(a.lastUsed||0)||(b.uses||0)-(a.uses||0)).slice(0,5).map(fromPreset);
   const names=new Set([...used.map(u=>u.name.toLowerCase()),...hid]),recent=[];
+  const idx=itemIndex();
   for(const e of [...S.entries].sort((a,b)=>b.ts-a.ts)){if(isHiddenEntry(e))continue;const o=S.ov.get(itemKey(e.name)),ed=o&&o.edited,nm=ed?o.name||e.name:e.name,n=itemKey(nm);
-    if(!names.has(n)){names.add(n);recent.push({name:nm,kcalEach:ed?+o.kcalEach:eachK(e),proteinEach:ed?+o.proteinEach:eachP(e),src:'quick'})}if(recent.length>=4)break}
+    if(!names.has(n)){names.add(n);recent.push({name:nm,kcalEach:ed?+o.kcalEach:eachK(e),proteinEach:ed?+o.proteinEach:eachP(e),src:'quick',origin:ed?'edited':(idx.get(n)||{}).origin||entryOrigin(e)})}if(recent.length>=4)break}
   S.chips=[...used,...recent];$('#quickSec').hidden=!S.chips.length;
   $('#chips').innerHTML=S.chips.map((c,i)=>`<button class="chip" data-i="${i}">+ ${esc(c.name)}<em class="num">${fmt(c.kcalEach)}</em></button>`).join('');
 }
@@ -601,10 +609,12 @@ function renderPage(){
   else list.sort(S.tab==='presets'?(a,b)=>((b.preset.uses||0)-(a.preset.uses||0))||a.name.localeCompare(b.name):(a,b)=>(b.count-a.count)||(b.ts-a.ts));
   S.pageList=list;
   const when=d=>d===S.today?'today':d===addDays(S.today,-1)?'yesterday':dayLabel(d,{day:'numeric',month:'short'});
-  const meta=it=>S.tab==='presets'?(it.preset.uses?'used '+it.preset.uses+'×':'not used yet'):[it.count?`logged ${it.count} ${it.count===1?'time':'times'}`:'added by you',it.day?'last '+when(it.day):'',it.edited?'edited':''].filter(Boolean).join(' · ');
+  const meta=it=>S.tab==='presets'?(it.preset.uses?'used '+it.preset.uses+'×':'not used yet'):[it.count?`logged ${it.count} ${it.count===1?'time':'times'}`:'added by you',it.day?'last '+when(it.day):''].filter(Boolean).join(' · ');
+  const srcOf=it=>S.tab==='presets'?(it.preset.origin==='edited'?'Edited by you':it.preset.origin&&it.preset.origin!=='manual'?'Saved from '+originLabel(it.preset.origin):'Created by you')
+    :it.created&&!it.count?'Added by you':it.edited?'Edited by you'+(it.origin&&it.origin!=='manual'?' · originally '+itemOriginLabel(it.origin):''):itemOriginLabel(it.origin);
   $('#ipNote').textContent=S.tab==='presets'?'Presets you’ve saved. Tap one to edit or delete it.':(S.allLoading&&!S.all?'Loading your history…':'Everything you’ve logged that isn’t a preset. Edits apply to future logs only.');
   $('#ipNew').textContent=S.tab==='presets'?'+ New preset':'+ New item';
-  $('#ipList').innerHTML=list.length?list.map((it,i)=>`<button class="row" data-pi="${i}"><div style="min-width:0"><div class="nm">${esc(it.name)}</div><div class="meta">${esc(meta(it))}</div></div><div class="vals num"><b>${fmtP(it.kcalEach)} kcal</b><span>${fmtP(it.proteinEach)} g</span></div></button>`).join('')
+  $('#ipList').innerHTML=list.length?list.map((it,i)=>`<button class="row" data-pi="${i}"><div style="min-width:0"><div class="nm">${esc(it.name)}</div><div class="meta">${esc(meta(it))}</div><div class="meta" style="color:var(--ink)">${esc(srcOf(it))}</div></div><div class="vals num"><b>${fmtP(it.kcalEach)} kcal</b><span>${fmtP(it.proteinEach)} g</span></div></button>`).join('')
     :`<div class="empty">${qt.length?'Nothing matches that search.':S.tab==='presets'?'No presets yet. Tap + New preset to add one.':'Nothing logged yet.'}</div>`;
 }
 $('#ipBack').onclick=()=>closePage();
@@ -621,12 +631,12 @@ function armed(btn,fn){btn.onclick=()=>{if(!btn.classList.contains('armed')){btn
 function pastItemSheet(it){
   openSheet(`${head('Edit past item',it.count?`Logged ${it.count} ${it.count===1?'time':'times'}`:'Added by you')}
     ${figFields(it.name,fmtP(it.kcalEach),fmtP(it.proteinEach))}
-    <div class="small">Used for future logs, search and Quick add. Past days stay as logged.</div>
+    <div class="small">Source: ${esc(it.created&&!it.count?'Added by you':it.edited?'Edited by you'+(it.origin&&it.origin!=='manual'?', originally '+itemOriginLabel(it.origin):''):itemOriginLabel(it.origin))}. Changes are used for future logs, search and Quick add. Past days stay as logged.</div>
     <div class="actions"><button class="secondary" id="iPre">Make preset</button><button class="danger" id="iDel">Delete</button></div>
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="iSave">Save</button></div>`,
   b=>{const save=v=>it.keys.forEach(k=>setOv(k,{name:v.name,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),edited:true,deletedAt:0}));
     b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;save(v);toast('Saved');closeSheet()};
-    b.querySelector('#iPre').onclick=()=>{const v=readFig(b);if(!v)return;save(v);savePreset(v);toast('Moved to Presets');closeSheet()};
+    b.querySelector('#iPre').onclick=()=>{const v=readFig(b);if(!v)return;save(v);const same=r1(v.kcal)===r1(it.kcalEach)&&r1(v.protein)===r1(it.proteinEach);savePreset({...v,origin:same?(it.edited?'edited':it.origin||'manual'):'edited'});toast('Moved to Presets');closeSheet()};
     armed(b.querySelector('#iDel'),()=>{const prev=it.keys.map(k=>[k,S.ov.get(k)]),now=Date.now();
       it.keys.forEach(k=>setOv(k,{deletedAt:now,edited:false,created:false}));closeSheet();
       toast('Deleted '+it.name,()=>prev.forEach(([k,o])=>{if(o){const{_id,...d}=o;setOv(k,d,false)}else S.base.collection('items').doc(ovId(k)).delete().catch(()=>{})}))})});
@@ -634,9 +644,9 @@ function pastItemSheet(it){
 function presetItemSheet(p){
   openSheet(`${head('Edit preset',p.uses?'Used '+p.uses+'×':'Not used yet')}
     ${figFields(p.name,fmtP(p.kcal),fmtP(p.protein))}
-    <div class="small">Changes apply next time you add it. Past days stay as logged.</div>
+    <div class="small">Source: ${esc(p.origin==='edited'?'Edited by you':p.origin&&p.origin!=='manual'?'saved from '+originLabel(p.origin):'Created by you')}. Changes apply next time you add it. Past days stay as logged.</div>
     <div class="actions"><button class="danger" id="iDel">Delete</button><button class="primary" id="iSave">Save</button></div>`,
-  b=>{b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;savePreset(v,p.id);toast('Preset saved');closeSheet()};
+  b=>{b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;const ch=r1(v.kcal)!==r1(p.kcal)||r1(v.protein)!==r1(p.protein);savePreset(ch?{...v,origin:'edited'}:v,p.id);toast('Preset saved');closeSheet()};
     armed(b.querySelector('#iDel'),()=>{const{id,...data}=p,k=itemKey(p.name),prev=S.ov.get(k);
       S.base.collection('presets').doc(id).delete().catch(()=>toast('Could not delete.'));setOv(k,{deletedAt:Date.now(),edited:false,created:false});closeSheet();
       toast('Deleted '+p.name,()=>{S.base.collection('presets').doc(id).set(data).catch(()=>{});if(prev){const{_id,...d}=prev;setOv(k,d,false)}else S.base.collection('items').doc(ovId(k)).delete().catch(()=>{})})})});
@@ -648,7 +658,7 @@ function newItemSheet(){
     <div class="small">${pre?'Shows in Presets, search and Quick add.':'Shows in search when you type its name.'} Nothing is logged until you add it.</div>
     <div class="actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="iSave">${pre?'Save preset':'Save item'}</button></div>`,
   b=>b.querySelector('#iSave').onclick=()=>{const v=readFig(b);if(!v)return;
-    if(pre)savePreset(v);else setOv(itemKey(v.name),{name:v.name,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),created:true,edited:true,deletedAt:0});
+    if(pre)savePreset({...v,origin:'manual'});else setOv(itemKey(v.name),{name:v.name,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),created:true,edited:true,deletedAt:0});
     toast(pre?'Preset saved':'Item saved');closeSheet()});
 }
 $('#scrim').onclick=()=>closeSheet();
@@ -699,7 +709,7 @@ function review(r){
       if(k==null||p==null){q('#rAdd').textContent='Enter both numbers';setTimeout(()=>q('#rAdd').textContent=addTxt,1800);return}
       let name=n;const o=opts[sel];
       if(o&&o.amt){const a=num(q('#amt').value);if(a!=null)name=n+' ('+fmt(a)+o.u+')'}else if(o&&o.l==='Half pack'&&!/half/i.test(n))name='Half '+n;
-      addEntry({name,kcalEach:k,proteinEach:p,qty:rq,src:r.src});if(q('#rPreset').checked)savePreset({name:n,kcal:k,protein:p});closeSheet();
+      addEntry({name,kcalEach:k,proteinEach:p,qty:rq,src:r.src,origin:r.src});if(q('#rPreset').checked)savePreset({name:n,kcal:k,protein:p,origin:r.src});closeSheet();
     };
   });
 }
@@ -796,7 +806,7 @@ Return JSON: {"name": short tidy name (max 40 chars), "kcal": number, "protein":
 ${JSON_RULES}`;
   let r;
   try{try{r=await gemini([{text:prompt}],{search:true,signal:ac.signal})}catch(e){if(ac.signal.aborted||e.code==='nokey'||e.code===403)throw e;r=await gemini([{text:prompt}],{signal:ac.signal})}}
-  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Typed entry',{name:text,src:'estimate',fixK:k,fixP:p});return}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Typed entry',{name:text,src:'typed',fixK:k,fixP:p});return}
   if(ac.signal.aborted)return;onClose=null;
   review({...r,name:r.name||text,type:'estimate',kicker:'Estimate',src:'estimate',fixK:k,fixP:p});
 }
@@ -862,12 +872,12 @@ Return JSON: {"type": "packaged"|"plate"|"unclear", "name": short tidy name (max
 ${JSON_RULES}`;
   let r;
   try{r=await gemini([{text:prompt},{inline_data:{mime_type:img.type||'image/jpeg',data:await b64(img)}}],{signal:ac.signal})}
-  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Photo',{name:note||'',src:'photo'});return}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Photo',{name:note||'',src:'typed'});return}
   if(ac.signal.aborted)return;onClose=null;
   if(r.type==='unclear'&&num(r.kcal)==null){
     openSheet(`${head('Couldn’t work that out','Photo')}<div class="note">${esc(r.note||'Try a photo of the nutrition label or the whole plate.')}</div><div class="actions"><button class="secondary" data-close>Close</button><button class="primary" id="again">Take another</button></div>`,
       b=>b.querySelector('#again').onclick=()=>{closeSheet();setTimeout(()=>$('#camFile').click(),150)});return}
-  const est={...r,kicker:r.type==='plate'?'Plate estimate':'Packaged food',src:'photo'};
+  const est={...r,kicker:r.type==='plate'?'Plate estimate':'Packaged food',src:r.type==='plate'?'plate':r.fromLabel?'label':'pack'};
   if(r.type==='packaged'&&!r.fromLabel&&(r.search||r.name)){
     est.online=r.search||r.name;
     let cancelled=false;busy('Finding the exact product…','Photo',()=>{cancelled=true});setBusy('Checking Open Food Facts for '+est.online+'…');
@@ -882,7 +892,7 @@ ${JSON_RULES}`;
 async function onlineThenReview(est){
   let cancelled=false;busy('Finding the exact product…','Photo',()=>{cancelled=true});
   try{const r=await fetchOnline(est.online);if(cancelled)return;onClose=null;
-    if(r&&r.confidence==='high'&&(num(r.kcal)!=null||r.per100||r.serving)){review({...r,type:'packaged',kicker:'Published figures',src:'search'});return}
+    if(r&&r.confidence==='high'&&(num(r.kcal)!=null||r.per100||r.serving)){review({...r,type:'packaged',kicker:'Published figures',src:'online'});return}
     review({...est,online:null,note:(est.note?est.note+' ':'')+'No published figures found online, so these are typical values.'})}
   catch(e){if(cancelled)return;onClose=null;
     const why=e&&e.code===429?'Online search is over Gemini’s free limit right now':'Online search didn’t work this time';
@@ -898,9 +908,9 @@ ${JSON_RULES}`;
 async function lookupOnline(name){
   const ac=new AbortController();busy('Searching online…',name,()=>ac.abort());
   let r;try{r=await fetchOnline(name,ac.signal)}
-  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Online lookup',{name,src:'photo'});return}
+  catch(e){if(ac.signal.aborted)return;onClose=null;gemFail(e,'Online lookup',{name,src:'typed'});return}
   if(ac.signal.aborted)return;onClose=null;
-  review({...r,type:'packaged',kicker:'Published figures',src:'search'});
+  review({...r,type:'packaged',kicker:'Published figures',src:'online'});
 }
 function showMatches(title,kicker,list,otherLabel,otherFn){
   const opt=r=>{const pk=r.per100&&r.pack.size?r.per100.kcal*r.pack.size/100:null;return pk!=null?fmt(pk)+' kcal/pack':r.serving?fmt(r.serving.kcal)+' kcal/serving':fmt(r.per100.kcal)+' kcal/100'+r.per100.unit};
@@ -968,8 +978,8 @@ function editEntry(id){
     mountQty(b,'eq',()=>qty,v=>{qty=v;tot()});q('#eK').oninput=tot;q('#eP').oninput=tot;tot();
     q('#eSave').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;
       ref.update({name:v.name,qty,kcalEach:r1(v.kcal),proteinEach:r1(v.protein),kcal:Math.round(v.kcal*qty),protein:r1(v.protein*qty)}).catch(()=>toast('Could not save.'));toast('Saved');closeSheet()};
-    q('#ePre').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;savePreset(v);toast('Saved as preset');closeSheet()};
-    q('#eDup').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;qtySheet({name:v.name,kcalEach:v.kcal,proteinEach:v.protein,src:'quick'},{day:S.today,kicker:'Add to today'})};
+    q('#ePre').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;savePreset({...v,origin:entryOrigin(en)});toast('Saved as preset');closeSheet()};
+    q('#eDup').onclick=()=>{const v=vals();if(v.kcal==null||v.protein==null)return;qtySheet({name:v.name,kcalEach:v.kcal,proteinEach:v.protein,src:'quick',origin:entryOrigin(en)},{day:S.today,kicker:'Add to today'})};
     q('#eMove').onclick=()=>moveSheet(en);
     const del=q('#eDel');del.onclick=()=>{if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Tap to confirm';return}
       const{id:_,...data}=en;ref.delete().catch(()=>toast('Could not delete.'));if(S.all)S.all=S.all.filter(x=>x.id!==id);toast('Deleted '+en.name,()=>ref.set(data));closeSheet()}});
@@ -1004,7 +1014,7 @@ function presetForm(p){
   b=>{const q=s=>b.querySelector(s);
     q('#fSave').onclick=()=>{const n=q('#fN').value.trim(),k=num(q('#fK').value),pr=num(q('#fP').value);
       if(!n||k==null||pr==null){q('#fErr').textContent='Add a name, calories and protein.';q('#fErr').hidden=false;return}
-      savePreset({name:n,kcal:k,protein:pr},p&&p.id);toast('Preset saved');presetsSheet()};
+      savePreset(p?{name:n,kcal:k,protein:pr,...(r1(k)!==r1(p.kcal)||r1(pr)!==r1(p.protein)?{origin:'edited'}:{})}:{name:n,kcal:k,protein:pr,origin:'manual'},p&&p.id);toast('Preset saved');presetsSheet()};
     if(q('#fBack'))q('#fBack').onclick=presetsSheet;
     const d=q('#fDel');if(d)d.onclick=()=>{if(!d.classList.contains('armed')){d.classList.add('armed');d.textContent='Tap to confirm';return}
       S.base.collection('presets').doc(p.id).delete().catch(()=>toast('Could not delete.'));toast('Preset deleted');presetsSheet()}});
